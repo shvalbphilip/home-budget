@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "home-budget",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd '/Users/philipshvalb/Desktop/Claude code/home-budget' && npm run dev -- --port 3001"],
+      "port": 3001
+    }
+  ]
+}
