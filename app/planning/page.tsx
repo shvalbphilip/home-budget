@@ -7,7 +7,9 @@ import RoomsManager from '@/components/planning/RoomsManager';
 import FloorPlan2D from '@/components/planning/FloorPlan2D';
 import Plan3DPreview from '@/components/planning/Plan3DPreview';
 import AdvisorChat from '@/components/planning/AdvisorChat';
-import { LayoutGrid, Boxes, Home, Sparkles, Box, Square, ImagePlus, ImageOff } from 'lucide-react';
+import RoomModal from '@/components/planning/RoomModal';
+import { ROOM_PRESETS } from '@/lib/planning/types';
+import { LayoutGrid, Boxes, Home, Sparkles, Box, Square, ImagePlus, ImageOff, Plus } from 'lucide-react';
 
 type Tab = 'overview' | 'plan' | 'rooms' | 'advisor';
 
@@ -20,11 +22,12 @@ const TABS: { id: Tab; label: string; icon: typeof Home }[] = [
 
 export default function PlanningPage() {
   const store = usePlanningStore();
-  const { loaded, load, rooms, items, floorPlanImage, floorPlanName, setFloorPlanImage, updateRoom, placeItem } = store;
+  const { loaded, load, rooms, items, floorPlanImage, floorPlanName, setFloorPlanImage, updateRoom, placeItem, addRoom } = store;
   const [tab, setTab] = useState<Tab>('overview');
   const [view3D, setView3D] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [opacity, setOpacity] = useState(0.5);
+  const [roomModalOpen, setRoomModalOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (!loaded) load(); }, [loaded, load]);
@@ -97,6 +100,12 @@ export default function PlanningPage() {
               </button>
             </div>
 
+            <button onClick={() => setRoomModalOpen(true)}
+              className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-white active:scale-95"
+              style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)', boxShadow: '0 4px 12px rgba(245,158,11,0.35)' }}>
+              <Plus size={14} /> הוסף חדר
+            </button>
+
             {!view3D && (
               <>
                 <button onClick={() => fileRef.current?.click()}
@@ -141,12 +150,33 @@ export default function PlanningPage() {
           )}
 
           {rooms.length === 0 && (
-            <div className="glass-card rounded-3xl p-8 text-center text-stone-400 text-sm">
-              אין עדיין חדרים. עברו ללשונית "חדרים" כדי להוסיף, והם יופיעו כאן בתוכנית.
+            <div className="glass-card rounded-3xl p-6 text-center space-y-3">
+              <div className="text-3xl">📐</div>
+              <p className="text-stone-700 font-semibold text-sm">צ׳רטטו את החדרים על גבי התשריט</p>
+              <p className="text-stone-400 text-xs max-w-md mx-auto leading-relaxed">
+                {floorPlanImage
+                  ? 'התשריט שהעליתם משמש כרקע. הוסיפו חדרים, ואז גררו ומתחו אותם כך שיתאימו לקווים בתשריט.'
+                  : 'הוסיפו חדרים, גררו ומתחו אותם לפי המידות. אפשר גם להעלות תשריט כרקע לשרטוט מדויק.'}
+              </p>
+              <div className="flex gap-2 flex-wrap justify-center pt-1">
+                {ROOM_PRESETS.map((p) => (
+                  <button key={p.name} onClick={() => addRoom({ name: p.name, emoji: p.emoji, color: p.color })}
+                    className="glass-card px-3 py-1.5 rounded-full text-xs font-medium text-stone-600 hover:text-amber-600 active:scale-95 transition-colors">
+                    {p.emoji} {p.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
       )}
+
+      <RoomModal
+        open={roomModalOpen}
+        room={null}
+        onClose={() => setRoomModalOpen(false)}
+        onSave={(data) => { addRoom(data); setRoomModalOpen(false); }}
+      />
     </div>
   );
 }
