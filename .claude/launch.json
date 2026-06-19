@@ -3,9 +3,11 @@
   "configurations": [
     {
       "name": "home-budget",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["-c", "cd '/Users/philipshvalb/Desktop/Claude code/home-budget' && npm run dev -- --port 3001"],
-      "port": 3001
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "3001"],
+      "cwd": "/Users/philipshvalb/Desktop/Claude code/home-budget",
+      "port": 3001,
+      "url": "http://localhost:3001"
     }
   ]
 }

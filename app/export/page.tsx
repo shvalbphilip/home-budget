@@ -52,7 +52,7 @@ export default function ExportPage() {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4 md:space-y-5">
       <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
         <FileSpreadsheet size={24} className="text-amber-500" /> יצוא וגיבוי
       </h1>

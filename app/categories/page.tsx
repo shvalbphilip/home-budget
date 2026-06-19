@@ -64,7 +64,7 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       <ConfirmDialog
         open={!!confirm}
         title={confirm?.type === 'delete' ? 'מחיקת קטגוריה' : 'איפוס קטגוריה'}

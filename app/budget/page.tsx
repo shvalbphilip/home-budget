@@ -30,7 +30,7 @@ export default function BudgetPage() {
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
         <Wallet size={24} className="text-amber-500" /> תכנון תקציב
       </h1>

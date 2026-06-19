@@ -71,9 +71,9 @@ function AddItemForm() {
   const labelCls = "block text-sm font-medium text-stone-700 mb-1";
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4 md:space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
+        <h1 className="text-xl md:text-2xl font-bold text-stone-900 flex items-center gap-2">
           <PlusCircle size={24} className="text-amber-500" />
           {editId ? 'עריכת פריט' : 'הוסף פריט'}
         </h1>
@@ -99,7 +99,7 @@ function AddItemForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-stone-200 p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-stone-200 p-4 md:p-6 space-y-4 md:space-y-5">
         <div className="grid md:grid-cols-2 gap-5">
           <div className="md:col-span-2">
             <label className={labelCls}>שם הפריט *</label>

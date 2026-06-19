@@ -19,18 +19,25 @@ const links = [
 export default function Sidebar() {
   const path = usePathname();
   return (
-    <aside className="w-64 shrink-0 bg-stone-900 text-stone-100 flex flex-col min-h-screen">
-      <div className="px-6 py-6 border-b border-stone-700">
+    <aside className="hidden md:flex w-64 shrink-0 flex-col min-h-screen glass-dark">
+      <div className="px-5 py-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center">
-            <Home size={20} className="text-white" />
+          <div
+            className="w-10 h-10 rounded-2xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(145deg, #fbbf24, #f59e0b)',
+              boxShadow: '0 4px 16px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.3)',
+            }}
+          >
+            <Home size={18} className="text-white" />
           </div>
           <div>
             <p className="font-bold text-white text-sm leading-tight">מעבר לדירה</p>
-            <p className="text-stone-400 text-xs">מנהל תקציב ומלאי</p>
+            <p className="text-white/40 text-xs">מנהל תקציב ומלאי</p>
           </div>
         </div>
       </div>
+
       <nav className="flex-1 px-3 py-4 space-y-1">
         {links.map(({ href, label, icon: Icon }) => {
           const active = path === href || (href !== '/dashboard' && path.startsWith(href));
@@ -38,20 +45,25 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
-              }`}
+              className="flex items-center gap-3 px-4 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200"
+              style={active ? {
+                background: 'rgba(251,191,36,0.22)',
+                color: '#fbbf24',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 8px rgba(251,191,36,0.15)',
+                border: '1px solid rgba(251,191,36,0.25)',
+              } : {
+                color: 'rgba(255,255,255,0.55)',
+              }}
             >
-              <Icon size={18} />
+              <Icon size={17} />
               <span>{label}</span>
             </Link>
           );
         })}
       </nav>
-      <div className="px-6 py-4 border-t border-stone-700">
-        <p className="text-stone-500 text-xs text-center">כל הנתונים נשמרים מקומית</p>
+
+      <div className="px-5 py-4 border-t border-white/10">
+        <p className="text-white/25 text-xs text-center">Supabase · Vercel</p>
       </div>
     </aside>
   );

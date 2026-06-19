@@ -32,7 +32,7 @@ export default function InventoryPage() {
   const itemToDelete = items.find((i) => i.id === deleteId);
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-5">
       <ConfirmDialog
         open={!!deleteId}
         title="מחיקת פריט"
@@ -45,18 +45,18 @@ export default function InventoryPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
-            <Package size={24} className="text-amber-500" /> מלאי
+          <h1 className="text-xl md:text-2xl font-bold text-stone-900 flex items-center gap-2">
+            <Package size={22} className="text-amber-500" /> מלאי
           </h1>
-          <p className="text-stone-500 text-sm">{filtered.length} מתוך {items.length} פריטים</p>
+          <p className="text-stone-500 text-xs md:text-sm">{filtered.length} מתוך {items.length} פריטים</p>
         </div>
-        <Link href="/add-item" className="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
+        <Link href="/add-item" className="md:flex hidden bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
           + הוסף פריט
         </Link>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 flex flex-wrap gap-3">
+      <div className="glass-card rounded-3xl p-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
           <input
@@ -97,7 +97,7 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Items list */}
       {items.length === 0 ? (
         <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center">
           <Package size={48} className="text-stone-300 mx-auto mb-3" />
@@ -109,66 +109,110 @@ export default function InventoryPage() {
           <p className="text-stone-400">לא נמצאו פריטים התואמים את הסינון</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-stone-50 border-b border-stone-200">
-                <tr>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">שם פריט</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">קטגוריה</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">סטטוס</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">עדיפות</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">כמות</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">הערכה</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">בפועל</th>
-                  <th className="px-4 py-3 text-right font-semibold text-stone-600">חנות</th>
-                  <th className="px-4 py-3 text-center font-semibold text-stone-600">חיוני</th>
-                  <th className="px-4 py-3 text-center font-semibold text-stone-600">פעולות</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {filtered.map((item) => {
-                  const cat = catMap[item.categoryId];
-                  return (
-                    <tr key={item.id} className="hover:bg-stone-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-stone-900">{item.name}</div>
-                        {item.notes && <div className="text-xs text-stone-400 mt-0.5">{item.notes}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-stone-600">{cat ? `${cat.emoji} ${cat.name}` : '—'}</td>
-                      <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
-                      <td className="px-4 py-3"><PriorityBadge priority={item.priority} /></td>
-                      <td className="px-4 py-3 text-stone-700">{item.quantity}</td>
-                      <td className="px-4 py-3 text-stone-700">{item.estimatedPrice > 0 ? fmt(item.estimatedPrice * item.quantity) : '—'}</td>
-                      <td className="px-4 py-3 text-stone-700">{item.actualPrice > 0 ? fmt(item.actualPrice * item.quantity) : '—'}</td>
-                      <td className="px-4 py-3 text-stone-600">
-                        {item.link ? (
-                          <a href={item.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-amber-600 hover:text-amber-700">
-                            {item.store || 'קישור'} <ExternalLink size={12} />
-                          </a>
-                        ) : item.store || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">{item.isEssential ? '✅' : '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <Link href={`/add-item?id=${item.id}`} className="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
-                            <Pencil size={14} />
-                          </Link>
-                          <button
-                            onClick={() => setDeleteId(item.id)}
-                            className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile: card list */}
+          <div className="md:hidden space-y-2">
+            {filtered.map((item) => {
+              const cat = catMap[item.categoryId];
+              return (
+                <div key={item.id} className="glass-card rounded-2xl p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-stone-900">{item.name}</span>
+                        {item.isEssential && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">חיוני</span>}
+                      </div>
+                      <p className="text-xs text-stone-500 mt-0.5">{cat ? `${cat.emoji} ${cat.name}` : '—'} · כמות: {item.quantity}</p>
+                      {item.notes && <p className="text-xs text-stone-400 mt-1 truncate">{item.notes}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Link href={`/add-item?id=${item.id}`} className="p-2 rounded-xl text-stone-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                        <Pencil size={16} />
+                      </Link>
+                      <button onClick={() => setDeleteId(item.id)} className="p-2 rounded-xl text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <StatusBadge status={item.status} />
+                    <PriorityBadge priority={item.priority} />
+                    {item.estimatedPrice > 0 && (
+                      <span className="text-xs text-stone-500">הערכה: <span className="font-medium text-stone-700">{fmt(item.estimatedPrice * item.quantity)}</span></span>
+                    )}
+                    {item.actualPrice > 0 && (
+                      <span className="text-xs text-stone-500">בפועל: <span className="font-medium text-emerald-700">{fmt(item.actualPrice * item.quantity)}</span></span>
+                    )}
+                    {item.link && (
+                      <a href={item.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-amber-600">
+                        {item.store || 'קישור'} <ExternalLink size={11} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+
+          {/* Desktop: table */}
+          <div className="hidden md:block glass-card rounded-3xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-stone-50 border-b border-stone-200">
+                  <tr>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">שם פריט</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">קטגוריה</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">סטטוס</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">עדיפות</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">כמות</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">הערכה</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">בפועל</th>
+                    <th className="px-4 py-3 text-right font-semibold text-stone-600">חנות</th>
+                    <th className="px-4 py-3 text-center font-semibold text-stone-600">חיוני</th>
+                    <th className="px-4 py-3 text-center font-semibold text-stone-600">פעולות</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {filtered.map((item) => {
+                    const cat = catMap[item.categoryId];
+                    return (
+                      <tr key={item.id} className="hover:bg-stone-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-stone-900">{item.name}</div>
+                          {item.notes && <div className="text-xs text-stone-400 mt-0.5">{item.notes}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-stone-600">{cat ? `${cat.emoji} ${cat.name}` : '—'}</td>
+                        <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
+                        <td className="px-4 py-3"><PriorityBadge priority={item.priority} /></td>
+                        <td className="px-4 py-3 text-stone-700">{item.quantity}</td>
+                        <td className="px-4 py-3 text-stone-700">{item.estimatedPrice > 0 ? fmt(item.estimatedPrice * item.quantity) : '—'}</td>
+                        <td className="px-4 py-3 text-stone-700">{item.actualPrice > 0 ? fmt(item.actualPrice * item.quantity) : '—'}</td>
+                        <td className="px-4 py-3 text-stone-600">
+                          {item.link ? (
+                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-amber-600 hover:text-amber-700">
+                              {item.store || 'קישור'} <ExternalLink size={12} />
+                            </a>
+                          ) : item.store || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">{item.isEssential ? '✅' : '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-2">
+                            <Link href={`/add-item?id=${item.id}`} className="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                              <Pencil size={14} />
+                            </Link>
+                            <button onClick={() => setDeleteId(item.id)} className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

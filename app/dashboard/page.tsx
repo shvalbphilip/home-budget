@@ -50,15 +50,15 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
-            <Home size={24} className="text-amber-500" /> לוח בקרה
+          <h1 className="text-xl md:text-2xl font-bold text-stone-900 flex items-center gap-2">
+            <Home size={22} className="text-amber-500" /> לוח בקרה
           </h1>
-          <p className="text-stone-500 text-sm mt-1">סיכום מצב המעבר לדירה</p>
+          <p className="text-stone-500 text-xs md:text-sm mt-0.5">סיכום מצב המעבר לדירה</p>
         </div>
-        <Link href="/add-item" className="bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
+        <Link href="/add-item" className="md:flex hidden bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
           + הוסף פריט
         </Link>
       </div>
@@ -67,7 +67,7 @@ export default function Dashboard() {
 
       {/* Budget overview */}
       {totalBudget > 0 ? (
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="glass-card rounded-3xl p-5">
           <div className="flex justify-between items-end mb-3">
             <div>
               <p className="text-sm text-stone-500">תקציב כולל</p>
@@ -79,37 +79,38 @@ export default function Dashboard() {
             </div>
           </div>
           <ProgressBar value={stats.budgetUsedPct} color={stats.budgetUsedPct > 90 ? 'red' : 'amber'} />
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div className="bg-red-50 rounded-xl p-3">
-              <p className="text-xs text-red-600 font-medium">הוצאה בפועל</p>
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <p className="text-xs text-red-500 font-medium">הוצאה בפועל</p>
               <p className="text-lg font-bold text-red-700">{fmt(stats.totalSpent)}</p>
             </div>
-            <div className="bg-emerald-50 rounded-xl p-3">
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
               <p className="text-xs text-emerald-600 font-medium">נותר בתקציב</p>
               <p className="text-lg font-bold text-emerald-700">{fmt(stats.remaining)}</p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
-          <p className="text-amber-700 text-sm font-medium">לא הוגדר תקציב כולל</p>
-          <Link href="/budget" className="text-sm bg-amber-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors">
+        <div className="glass-amber rounded-3xl p-4 flex items-center justify-between">
+          <p className="text-amber-800 text-sm font-medium">לא הוגדר תקציב כולל</p>
+          <Link href="/budget" className="text-sm text-white px-4 py-2 rounded-2xl font-semibold transition-all active:scale-95"
+            style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)', boxShadow: '0 4px 12px rgba(245,158,11,0.35)' }}>
             הגדר תקציב
           </Link>
         </div>
       )}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard title="פריטים שנרכשו" value={String(stats.totalPurchased)} icon={CheckCircle} color="green" />
         <StatCard title="פריטים חסרים" value={String(stats.totalMissing)} icon={ShoppingBag} color="amber" />
         <StatCard title="בבעלותי" value={String(stats.totalOwned)} icon={Package} color="blue" />
         <StatCard title="סה״כ פריטים" value={String(items.length)} icon={Wallet} color="stone" />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-4 md:gap-6">
         {/* Incomplete rooms */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="glass-card rounded-3xl p-5">
           <h2 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
             <Home size={16} className="text-amber-500" /> חדרים שלא הושלמו
           </h2>
@@ -131,7 +132,7 @@ export default function Dashboard() {
         </div>
 
         {/* High priority missing */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="glass-card rounded-3xl p-5">
           <h2 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
             <AlertCircle size={16} className="text-red-500" /> רכישות בעדיפות גבוהה
           </h2>
@@ -164,7 +165,7 @@ export default function Dashboard() {
 
       {/* Category budget breakdown */}
       {catStats.some((c) => c.total > 0 || c.plannedBudget > 0) && (
-        <div className="bg-white rounded-2xl border border-stone-200 p-5">
+        <div className="glass-card rounded-3xl p-5">
           <h2 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
             <TrendingDown size={16} className="text-amber-500" /> פירוט תקציב לפי קטגוריה
           </h2>
