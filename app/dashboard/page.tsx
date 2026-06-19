@@ -4,7 +4,7 @@ import { getDashboardStats, getCategoryStats, fmt } from '@/lib/utils';
 import StatCard from '@/components/StatCard';
 import ProgressBar from '@/components/ProgressBar';
 import AlertBanner from '@/components/AlertBanner';
-import { Wallet, ShoppingBag, CheckCircle, AlertCircle, TrendingDown, Package, Home } from 'lucide-react';
+import { Wallet, ShoppingBag, CheckCircle, AlertCircle, TrendingDown, Package, Home, Boxes, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -58,10 +58,33 @@ export default function Dashboard() {
           </h1>
           <p className="text-stone-500 text-xs md:text-sm mt-0.5">סיכום מצב המעבר לדירה</p>
         </div>
-        <Link href="/add-item" className="md:flex hidden bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
-          + הוסף פריט
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/inventory" className="glass-card px-3 py-2 rounded-xl text-sm font-semibold text-stone-600 flex items-center gap-1.5">
+            <Package size={16} /> מלאי
+          </Link>
+          <Link href="/add-item" className="md:flex hidden bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
+            + הוסף פריט
+          </Link>
+        </div>
       </div>
+
+      {/* Planning hero */}
+      <Link href="/planning" className="block rounded-3xl p-5 relative overflow-hidden active:scale-[0.99] transition-transform"
+        style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.92), rgba(245,158,11,0.92))', boxShadow: '0 8px 28px rgba(245,158,11,0.30)' }}>
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-white/90 text-xs font-semibold mb-1">
+              <Boxes size={15} /> חדש
+            </div>
+            <p className="text-white font-bold text-lg leading-tight">תכנון הדירה</p>
+            <p className="text-white/85 text-xs mt-0.5">תוכנית קומה, חדרים, 3D ויועץ חכם</p>
+          </div>
+          <div className="flex items-center gap-1 text-white font-semibold text-sm">
+            פתח <ChevronLeft size={18} />
+          </div>
+        </div>
+        <div className="absolute -left-6 -bottom-8 text-[110px] opacity-20 leading-none">🏠</div>
+      </Link>
 
       {alerts.length > 0 && <AlertBanner alerts={alerts} />}
 

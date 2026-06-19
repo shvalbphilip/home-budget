@@ -3,11 +3,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, ShoppingCart, Wallet,
-  Grid3x3, FileSpreadsheet, PlusCircle, Home
+  Grid3x3, FileSpreadsheet, PlusCircle, Home, Boxes
 } from 'lucide-react';
 
 const links = [
   { href: '/dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
+  { href: '/planning', label: 'תכנון הדירה', icon: Boxes },
   { href: '/inventory', label: 'מלאי', icon: Package },
   { href: '/add-item', label: 'הוסף פריט', icon: PlusCircle },
   { href: '/shopping', label: 'רשימת קניות', icon: ShoppingCart },

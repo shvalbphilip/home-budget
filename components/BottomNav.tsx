@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, PlusCircle, ShoppingCart, Wallet } from 'lucide-react';
+import { LayoutDashboard, Boxes, PlusCircle, ShoppingCart, Wallet } from 'lucide-react';
 
 const tabs = [
   { href: '/dashboard', label: 'בקרה', icon: LayoutDashboard },
-  { href: '/inventory', label: 'מלאי', icon: Package },
+  { href: '/planning', label: 'תכנון', icon: Boxes },
   { href: '/add-item', label: 'הוסף', icon: PlusCircle, primary: true },
   { href: '/shopping', label: 'קניות', icon: ShoppingCart },
   { href: '/budget', label: 'תקציב', icon: Wallet },
