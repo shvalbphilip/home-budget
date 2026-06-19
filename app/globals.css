@@ -93,3 +93,53 @@ body::before {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+
+/* ── Polish: smooth motion, transitions, focus ─────────────────────────────── */
+html { scroll-behavior: smooth; }
+html, body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+/* gentle, consistent transitions on interactive surfaces */
+button, a, input, select, textarea, .glass, .glass-card, .glass-dark, .glass-nav {
+  transition:
+    background-color .2s ease,
+    border-color .2s ease,
+    box-shadow .25s ease,
+    color .2s ease,
+    transform .18s cubic-bezier(.22,1,.36,1),
+    opacity .2s ease;
+}
+
+/* tactile press feedback everywhere */
+button:active, a:active, [role="button"]:active { transform: scale(.97); }
+
+/* accessible, on-brand focus ring */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(251,191,36,0.45);
+  border-radius: 12px;
+}
+
+/* keyframes */
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn  { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes shimmer  { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes floaty   { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* page transition wrapper (re-mounts per route) */
+.page-enter { animation: fadeInUp .42s cubic-bezier(.22,1,.36,1) both; }
+.pop-in     { animation: scaleIn .28s cubic-bezier(.22,1,.36,1) both; }
+
+/* skeleton shimmer */
+.skeleton {
+  background: linear-gradient(100deg, rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.05) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 12px;
+}
+
+/* respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

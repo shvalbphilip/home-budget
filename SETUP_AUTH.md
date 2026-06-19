@@ -179,3 +179,75 @@ tables (anon, `allow_all`) so the live app never broke. Tightening those to be
 project-scoped + auth-only is a clean **follow-up** once you confirm the new auth
 flow works for you both — say the word and I'll migrate them and wire the planning
 store to the new `rooms`/`room_items` tables.
+
+---
+
+## 10. ⚠️ Going live safely — avoid locking yourself out
+
+Turning the flag on makes the site show the **sign-in page on first load**. But a login
+needs a **real user to exist first** — otherwise nobody (including you) can get in.
+So the order matters:
+
+1. Run the migration (step 2) → 2. Create your user (step 3) → 3. Bootstrap (step 4) →
+4. **only then** set `NEXT_PUBLIC_AUTH_ENABLED=true` and redeploy (step 6).
+
+Once a user exists, switching the flag on is reversible at any time (set it back to
+`false` + redeploy). Tell me when your account exists and I'll flip the env var for you.
+
+---
+
+## 11. Tokens (JWT access + refresh) — already handled
+
+You do **not** need to hand-build tokens. On every sign-in (password / Google / SMS)
+Supabase issues:
+
+* a short-lived **JWT access token** (default 1 hour — adjustable in *Auth → Settings*), and
+* a long-lived **refresh token** that is automatically rotated.
+
+The client (`lib/supabase.ts`) is configured with `persistSession`, `autoRefreshToken`
+and PKCE, so sessions survive refreshes and the access token is renewed silently in the
+background. RLS uses the JWT to identify the user on every request.
+
+---
+
+## 12. Google sign-in
+
+The "המשך עם Google" button is already in the login screen. To make it work:
+
+1. **Google Cloud Console** → create an OAuth 2.0 Client (type *Web*). Authorized redirect URI:
+   ```
+   https://kmypvvpcmpybdrukstwk.supabase.co/auth/v1/callback
+   ```
+2. **Supabase → Authentication → Providers → Google** → enable, paste the Client ID + Secret.
+3. **Supabase → Authentication → URL Configuration** → add your site to *Redirect URLs*:
+   ```
+   https://home-budget-delta.vercel.app/auth/callback
+   http://localhost:3001/auth/callback
+   ```
+
+No secrets go in the repo — the Client ID/Secret live only in Supabase. The app uses the
+secure **Authorization-Code + PKCE** flow and finishes at `/auth/callback`.
+(To hide the button until configured, set `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=false`.)
+
+---
+
+## 13. SMS two-factor (for email/password logins)
+
+When `NEXT_PUBLIC_SMS_2FA_ENABLED=true`, an email/password sign-in is followed by an
+**SMS one-time code** step (Google logins skip it — that provider is already trusted).
+
+It uses Supabase's native **MFA phone factor**, which needs an SMS provider:
+
+1. **Supabase → Authentication → Providers → Phone** → enable, and connect an SMS
+   provider (Twilio / MessageBird / Vonage) with its credentials (kept in Supabase only).
+2. **Supabase → Authentication → Multi-Factor** → enable the **Phone** factor.
+3. Set `NEXT_PUBLIC_SMS_2FA_ENABLED=true` (Vercel + local) and redeploy.
+
+First login asks for the phone number (enrolls the factor + sends a code); later logins
+just send a code to the saved number.
+
+> Zero-cost alternative: Supabase also supports **TOTP** (authenticator app) MFA with no
+> SMS provider needed. Say the word and I'll switch the second factor to TOTP.
+
+> Hardening follow-up: the 2FA step currently runs in the login flow. Enforcing AAL2
+> globally (so a half-authenticated session can't deep-link past it) is a small follow-up.

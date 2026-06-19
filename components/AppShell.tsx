@@ -60,7 +60,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-auto pb-20 md:pb-0">{children}</main>
+      <main className="flex-1 overflow-auto pb-20 md:pb-0">
+        <div key={path} className="page-enter">{children}</div>
+      </main>
       <BottomNav />
     </div>
   );
