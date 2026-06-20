@@ -7,7 +7,7 @@ interface Props {
   open: boolean;
   room: Room | null;          // null = create
   onClose: () => void;
-  onSave: (data: { name: string; emoji: string; width: number; length: number; height: number; color: string; priority: RoomPriority; notes: string }) => void;
+  onSave: (data: { name: string; emoji: string; width: number; length: number; height: number; color: string; priority: RoomPriority; notes: string; plannedBudget: number }) => void;
 }
 
 const COLORS = ['#f59e0b', '#8b5cf6', '#3b82f6', '#14b8a6', '#22c55e', '#06b6d4', '#ec4899', '#64748b'];
@@ -21,15 +21,17 @@ export default function RoomModal({ open, room, onClose, onSave }: Props) {
   const [color, setColor] = useState(COLORS[0]);
   const [priority, setPriority] = useState<RoomPriority>('חשוב');
   const [notes, setNotes] = useState('');
+  const [plannedBudget, setPlannedBudget] = useState(0);
 
   useEffect(() => {
     if (room) {
       setName(room.name); setEmoji(room.emoji);
       setWidth(room.width); setLength(room.length); setHeight(room.height);
       setColor(room.color); setPriority(room.priority); setNotes(room.notes);
+      setPlannedBudget(room.plannedBudget ?? 0);
     } else {
       setName(''); setEmoji('🏠'); setWidth(300); setLength(250); setHeight(270);
-      setColor(COLORS[0]); setPriority('חשוב'); setNotes('');
+      setColor(COLORS[0]); setPriority('חשוב'); setNotes(''); setPlannedBudget(0);
     }
   }, [room, open]);
 
@@ -40,7 +42,7 @@ export default function RoomModal({ open, room, onClose, onSave }: Props) {
 
   const submit = () => {
     if (!name.trim()) { alert('שם החדר הוא שדה חובה'); return; }
-    onSave({ name: name.trim(), emoji: emoji || '🏠', width, length, height, color, priority, notes });
+    onSave({ name: name.trim(), emoji: emoji || '🏠', width, length, height, color, priority, notes, plannedBudget });
   };
 
   return (
@@ -76,6 +78,11 @@ export default function RoomModal({ open, room, onClose, onSave }: Props) {
             <label className={label}>גובה (ס״מ)</label>
             <input type="number" min={200} className={input} value={height} onChange={(e) => setHeight(Number(e.target.value))} />
           </div>
+        </div>
+
+        <div>
+          <label className={label}>תקציב מתוכנן לחדר (₪) — אופציונלי</label>
+          <input type="number" min={0} className={input} value={plannedBudget || ''} onChange={(e) => setPlannedBudget(Number(e.target.value))} placeholder="לדוגמה: 70000" />
         </div>
 
         <div>

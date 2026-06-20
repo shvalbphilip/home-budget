@@ -1,10 +1,35 @@
 // ── Apartment Planning domain types ─────────────────────────────────────────
 
 export type RoomPriority = 'חובה' | 'חשוב' | 'נחמד שיהיה';
-export type PlanItemStatus = 'יש לנו' | 'חסר' | 'אולי' | 'לא צריך';
+export type PlanItemStatus = 'בבעלותי' | 'צריך לקנות' | 'חסר' | 'אולי' | 'לא צריך';
+export type PaymentStatus = 'לא שולם' | 'שולם חלקית' | 'שולם במלואו' | 'חורג מהתקציב';
+export type RoomBudgetStatus = 'עומד בתקציב' | 'קרוב לחריגה' | 'חורג מהתקציב' | 'שולם מלא' | 'בתהליך';
 
 export const ROOM_PRIORITIES: RoomPriority[] = ['חובה', 'חשוב', 'נחמד שיהיה'];
-export const PLAN_ITEM_STATUSES: PlanItemStatus[] = ['יש לנו', 'חסר', 'אולי', 'לא צריך'];
+export const PLAN_ITEM_STATUSES: PlanItemStatus[] = ['בבעלותי', 'צריך לקנות', 'חסר', 'אולי', 'לא צריך'];
+
+/** Full cost/work category taxonomy (furniture/products + renovation/contractor). */
+export const ITEM_CATEGORIES: string[] = [
+  'ריהוט', 'מוצרי חשמל', 'נגרות', 'שיש', 'חומרי גלם', 'קבלן',
+  'עבודות חשמל', 'אינסטלציה', 'צבע', 'ריצוף', 'חיפויים', 'תאורה',
+  'מזגנים', 'אלומיניום', 'דלתות', 'הובלה והרכבה', 'התקנות', 'תיקונים',
+  'אגרות / תשלומים', 'אחר',
+];
+
+/** Categories that count as contractor / renovation work (vs furniture & products). */
+export const CONTRACTOR_CATEGORIES = new Set<string>([
+  'נגרות', 'שיש', 'חומרי גלם', 'קבלן', 'עבודות חשמל', 'אינסטלציה', 'צבע',
+  'ריצוף', 'חיפויים', 'אלומיניום', 'דלתות', 'הובלה והרכבה', 'התקנות',
+  'תיקונים', 'אגרות / תשלומים',
+]);
+
+/** Map legacy statuses from older saved plans to the new taxonomy. */
+export function normalizeStatus(s: string): PlanItemStatus {
+  if (s === 'יש לנו') return 'בבעלותי';
+  if (s === 'לרכישה') return 'צריך לקנות';
+  if ((PLAN_ITEM_STATUSES as string[]).includes(s)) return s as PlanItemStatus;
+  return 'חסר';
+}
 
 /** Predefined apartment rooms (Hebrew) used as quick-add presets. */
 export const ROOM_PRESETS: { name: string; emoji: string; color: string }[] = [
@@ -32,6 +57,7 @@ export interface Room {
   color: string;   // hex
   notes: string;
   priority: RoomPriority;
+  plannedBudget: number;  // planned budget for this room (₪) — optional (0 = none)
   createdAt: string;
 }
 
@@ -43,11 +69,14 @@ export interface PlanItem {
   status: PlanItemStatus;
   priority: RoomPriority;
   quantity: number;
-  price: number;        // unit estimated price (₪)
+  price: number;        // PLANNED unit price (₪)
+  actualPrice: number;  // ACTUAL final unit price (₪) — 0 if not known yet
+  paidAmount: number;   // total amount paid so far (₪)
+  supplier: string;     // supplier / contractor name
   store: string;
-  link: string;
+  link: string;         // invoice / quote link
   notes: string;
-  category: string;     // free-text budget category
+  category: string;     // from ITEM_CATEGORIES
   bought: boolean;
   // Optional placement on the 2D plan (cm, relative to the room's origin)
   placed: boolean;
@@ -57,10 +86,10 @@ export interface PlanItem {
 }
 
 export interface StyleProfile {
-  style: string;            // e.g. מודרני / כפרי / סקנדינבי
-  budget: number;           // total apartment budget the couple set
-  topPriorities: string;    // free text
-  partnerNotes: string;     // notes from the partner
+  style: string;
+  budget: number;           // optional global apartment budget
+  topPriorities: string;
+  partnerNotes: string;
   answers: Record<string, string>;
 }
 
@@ -77,8 +106,8 @@ export interface ApartmentPlan {
   items: PlanItem[];
   style: StyleProfile;
   chat: ChatMessage[];
-  floorPlanImage: string | null;  // dataURL of an uploaded plan (image)
-  floorPlanName: string | null;   // original filename (for PDFs we keep the name)
+  floorPlanImage: string | null;
+  floorPlanName: string | null;
   updatedAt: string;
 }
 
@@ -91,7 +120,7 @@ export const emptyStyle = (): StyleProfile => ({
 });
 
 export const emptyPlan = (): ApartmentPlan => ({
-  version: '1.0',
+  version: '2.0',
   rooms: [],
   items: [],
   style: emptyStyle(),

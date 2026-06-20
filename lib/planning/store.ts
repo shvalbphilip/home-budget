@@ -86,6 +86,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       color: room.color ?? ROOM_COLORS[existing.length % ROOM_COLORS.length],
       notes: room.notes ?? '',
       priority: room.priority ?? 'חשוב',
+      plannedBudget: room.plannedBudget ?? 0,
       createdAt: new Date().toISOString(),
     };
     set({ rooms: [...existing, newRoom] });
@@ -117,6 +118,9 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       priority: item.priority ?? 'חשוב',
       quantity: item.quantity ?? 1,
       price: item.price ?? 0,
+      actualPrice: item.actualPrice ?? 0,
+      paidAmount: item.paidAmount ?? 0,
+      supplier: item.supplier ?? '',
       store: item.store ?? '',
       link: item.link ?? '',
       notes: item.notes ?? '',
@@ -147,7 +151,7 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
       items: get().items.map((i) => {
         if (i.id !== id) return i;
         const bought = !i.bought;
-        return { ...i, bought, status: bought ? 'יש לנו' : i.status };
+        return { ...i, bought, status: bought ? 'בבעלותי' : i.status };
       }),
     });
     scheduleSave(get);

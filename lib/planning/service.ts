@@ -1,6 +1,6 @@
 'use client';
 import { supabase } from '../supabase';
-import { ApartmentPlan, emptyPlan } from './types';
+import { ApartmentPlan, emptyPlan, normalizeStatus } from './types';
 
 // Persistence for the apartment plan.
 // Strategy: a single JSONB document. Try Supabase first (cross-device),
@@ -98,8 +98,15 @@ function normalize(plan: ApartmentPlan): ApartmentPlan {
     ...base,
     ...plan,
     style: { ...base.style, ...(plan.style ?? {}) },
-    rooms: plan.rooms ?? [],
-    items: plan.items ?? [],
+    rooms: (plan.rooms ?? []).map((r) => ({ ...r, plannedBudget: r.plannedBudget ?? 0 })),
+    items: (plan.items ?? []).map((i) => ({
+      ...i,
+      status: normalizeStatus(i.status as unknown as string),
+      actualPrice: i.actualPrice ?? 0,
+      paidAmount: i.paidAmount ?? 0,
+      supplier: i.supplier ?? '',
+      category: i.category ?? '',
+    })),
     chat: plan.chat ?? [],
   };
 }
