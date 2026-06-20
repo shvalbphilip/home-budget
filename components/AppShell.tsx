@@ -23,14 +23,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = usePathname();
 
+  // Load this user's data once we know who they are (so the JWT scopes the rows).
+  // When auth is disabled, load immediately.
+  const userId = session?.user?.id ?? null;
   useEffect(() => {
-    loadFromDB();
-  }, []);
+    if (!enabled || userId) loadFromDB();
+  }, [enabled, userId]);
 
-  // Auth gating (only active when NEXT_PUBLIC_AUTH_ENABLED=true)
+  // Auth gating (only active when NEXT_PUBLIC_AUTH_ENABLED=true).
+  // /login and /auth/callback must NOT be bounced — the callback needs to run
+  // so it can exchange the Google OAuth code for a session.
   useEffect(() => {
     if (!enabled || authLoading) return;
-    if (!session && path !== '/login') router.replace('/login');
+    const open = path === '/login' || path === '/auth/callback';
+    if (!session && !open) router.replace('/login');
     if (session && path === '/login') router.replace('/dashboard');
   }, [enabled, authLoading, session, path, router]);
 
@@ -42,8 +48,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (onboardingComplete && path === '/onboarding') router.replace('/dashboard');
   }, [loaded, onboardingComplete, path, router, enabled, session]);
 
-  // Login page renders bare (no shell)
-  if (path === '/login') return <>{children}</>;
+  // Login + OAuth callback render bare (no shell, no auth gate)
+  if (path === '/login' || path === '/auth/callback') return <>{children}</>;
 
   // Auth gate
   if (enabled) {

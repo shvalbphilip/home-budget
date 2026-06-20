@@ -8,12 +8,20 @@ import { ApartmentPlan, emptyPlan } from './types';
 // `apartment_plan` migration is pushed. The moment the table exists, sync
 // activates automatically with no code change.
 
-const LS_KEY = 'apartment_plan_v1';
+// Per-user "profile memory": the plan + advisor history are scoped to the
+// signed-in user (separate localStorage key and separate apartment_plan row),
+// so each profile keeps its own plan, style and AI conversation.
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+const lsKey = (uid: string | null) => (uid ? `apartment_plan_${uid}` : 'apartment_plan_v1');
+const docId = (uid: string | null) => uid ?? 'main';
 
-function readLocal(): ApartmentPlan | null {
+function readLocal(uid: string | null): ApartmentPlan | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(LS_KEY);
+    const raw = window.localStorage.getItem(lsKey(uid));
     if (!raw) return null;
     return JSON.parse(raw) as ApartmentPlan;
   } catch {
@@ -21,14 +29,14 @@ function readLocal(): ApartmentPlan | null {
   }
 }
 
-function writeLocal(plan: ApartmentPlan) {
+function writeLocal(uid: string | null, plan: ApartmentPlan) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(LS_KEY, JSON.stringify(plan));
+    window.localStorage.setItem(lsKey(uid), JSON.stringify(plan));
   } catch {
     // storage full (large floor-plan image) — drop the image and retry
     try {
-      window.localStorage.setItem(LS_KEY, JSON.stringify({ ...plan, floorPlanImage: null }));
+      window.localStorage.setItem(lsKey(uid), JSON.stringify({ ...plan, floorPlanImage: null }));
     } catch {
       /* give up silently */
     }
@@ -47,18 +55,19 @@ function isMeaningful(plan: ApartmentPlan | null | undefined): plan is Apartment
 }
 
 export async function loadPlan(): Promise<ApartmentPlan> {
-  const local = readLocal();
-  // Try remote
+  const uid = await currentUserId();
+  const local = readLocal(uid);
+  // Try remote (this user's own plan row)
   try {
     const { data, error } = await supabase
       .from('apartment_plan')
       .select('data')
-      .eq('id', 'main')
+      .eq('id', docId(uid))
       .single();
     if (!error && data) {
       const remote = data.data as ApartmentPlan;
       if (isMeaningful(remote)) {
-        writeLocal(remote);
+        writeLocal(uid, remote);
         return normalize(remote);
       }
     }
@@ -70,12 +79,13 @@ export async function loadPlan(): Promise<ApartmentPlan> {
 }
 
 export async function savePlan(plan: ApartmentPlan): Promise<void> {
+  const uid = await currentUserId();
   const stamped = { ...plan, updatedAt: new Date().toISOString() };
-  writeLocal(stamped);
+  writeLocal(uid, stamped);
   try {
     await supabase
       .from('apartment_plan')
-      .upsert({ id: 'main', data: stamped, updated_at: stamped.updatedAt });
+      .upsert({ id: docId(uid), data: stamped, updated_at: stamped.updatedAt });
   } catch {
     /* remote unavailable — local copy already persisted */
   }

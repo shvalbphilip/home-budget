@@ -13,7 +13,10 @@ export const supabase = createClient(url, key, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // The OAuth code is exchanged explicitly in /auth/callback, so we turn off
+    // auto-detection to avoid a double-exchange race (which consumes the code
+    // and leaves no session → bounce back to /login).
+    detectSessionInUrl: false,
     flowType: 'pkce',
   },
 });

@@ -3,18 +3,36 @@ import { supabase } from './supabase';
 import { Category, Item } from './types';
 
 // ── Settings ──────────────────────────────────────────────────────────────
+// Per-user: RLS returns only the signed-in user's row, so we take the first
+// (and only) visible row. Categories/items auto-scope the same way and fill
+// user_id from the JWT via a column default — no change needed there.
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+
 export async function fetchSettings() {
-  const { data } = await supabase.from('settings').select('*').eq('id', 'main').single();
+  const { data } = await supabase
+    .from('settings')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
   return data as { total_budget: number; onboarding_complete: boolean } | null;
 }
 
 export async function saveSettings(totalBudget: number, onboardingComplete: boolean) {
-  await supabase.from('settings').upsert({
-    id: 'main',
+  const uid = await currentUserId();
+  const row = {
     total_budget: totalBudget,
     onboarding_complete: onboardingComplete,
     updated_at: new Date().toISOString(),
-  });
+  };
+  if (uid) {
+    await supabase.from('settings').upsert({ user_id: uid, ...row }, { onConflict: 'user_id' });
+  } else {
+    await supabase.from('settings').upsert({ id: 'main', ...row });
+  }
 }
 
 // ── Categories ────────────────────────────────────────────────────────────

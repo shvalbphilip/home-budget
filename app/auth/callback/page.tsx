@@ -3,35 +3,43 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-// Google (and any OAuth) redirect lands here. With flowType:'pkce' +
-// detectSessionInUrl, supabase-js exchanges the code for a session
-// automatically; we just wait for it and route onward.
+// Google (and any OAuth) redirect lands here with ?code=... We explicitly
+// exchange that code (PKCE) for a session, then route into the app.
 export default function AuthCallback() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let done = false;
-    const finish = (ok: boolean) => {
-      if (done) return; done = true;
-      router.replace(ok ? '/dashboard' : '/login');
+    let cancelled = false;
+    const fail = (msg: string) => {
+      if (cancelled) return;
+      setError(msg);
+      setTimeout(() => router.replace('/login'), 1800);
     };
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) finish(true);
-    });
+    (async () => {
+      try {
+        // already signed in?
+        const { data: pre } = await supabase.auth.getSession();
+        if (pre.session) { router.replace('/dashboard'); return; }
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session) finish(true);
-    });
+        const params = new URLSearchParams(window.location.search);
+        const errDesc = params.get('error_description') || params.get('error');
+        if (errDesc) { fail(decodeURIComponent(errDesc)); return; }
 
-    const timer = setTimeout(async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) finish(true);
-      else { setError('ההתחברות נכשלה. נסו שוב.'); setTimeout(() => finish(false), 1500); }
-    }, 4000);
+        const code = params.get('code');
+        if (!code) { fail('לא התקבל קוד התחברות'); return; }
 
-    return () => { sub.subscription.unsubscribe(); clearTimeout(timer); };
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error || !data.session) { fail('ההתחברות נכשלה, נסו שוב'); return; }
+
+        if (!cancelled) router.replace('/dashboard');
+      } catch {
+        fail('שגיאת התחברות');
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [router]);
 
   return (
@@ -43,7 +51,7 @@ export default function AuthCallback() {
             <p className="text-stone-500 text-sm font-medium">מתחבר...</p>
           </>
         ) : (
-          <p className="text-red-600 text-sm font-medium">{error}</p>
+          <p className="text-red-600 text-sm font-medium max-w-xs px-4">{error}</p>
         )}
       </div>
     </div>
