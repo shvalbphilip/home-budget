@@ -1,6 +1,9 @@
 import * as XLSX from 'xlsx';
-import { Room, PlanItem, StyleProfile, ApartmentPlan } from './types';
-import { getRoomStats, getPlanSummary, itemTotal, roomAreaM2 } from './geometry';
+import { Room, PlanItem, StyleProfile, ApartmentPlan, CONTRACTOR_CATEGORIES } from './types';
+import {
+  getRoomStats, getPlanSummary, roomAreaM2,
+  itemPlanned, itemActual, itemPaid, itemRemaining, itemPaymentStatus,
+} from './geometry';
 
 const shekelFmt = '₪#,##0';
 
@@ -17,102 +20,101 @@ function moneyCols(ws: XLSX.WorkSheet, rows: number, cols: string[]) {
   }
 }
 
-/** Export the apartment plan to a multi-sheet Excel workbook. */
+/** Export the apartment plan to a multi-sheet Excel workbook (full budget system). */
 export function exportPlanToExcel(rooms: Room[], items: PlanItem[], style: StyleProfile) {
   const wb = XLSX.utils.book_new();
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? '—';
   const summary = getPlanSummary(rooms, items, style.budget);
 
-  // Sheet 1: Rooms
-  const roomHeaders = ['חדר', 'אמוג׳י', 'עדיפות', 'רוחב (ס״מ)', 'אורך (ס״מ)', 'גובה (ס״מ)', 'שטח (מ״ר)', 'פריטים', 'יש לנו', 'חסר', 'מוכנות %', 'עלות מתוכננת', 'הערות'];
-  const roomRows = rooms.map((r) => {
-    const s = getRoomStats(r, items);
-    return [r.name, r.emoji, r.priority, r.width, r.length, r.height, roomAreaM2(r),
-      s.total, s.have, s.missing, s.readiness / 100, s.estimatedCost, r.notes];
-  });
-  const roomData = [roomHeaders, ...roomRows];
-  const ws1 = XLSX.utils.aoa_to_sheet(roomData);
-  autoWidth(ws1, roomData);
-  for (let r = 1; r <= roomRows.length; r++) {
-    if (ws1['K' + (r + 1)]) ws1['K' + (r + 1)].z = '0%';
-    if (ws1['L' + (r + 1)]) ws1['L' + (r + 1)].z = shekelFmt;
-  }
-  XLSX.utils.book_append_sheet(wb, ws1, 'חדרים');
-
-  // Sheet 2: All items
-  const itemHeaders = ['פריט', 'חדר', 'קטגוריה', 'סטטוס', 'עדיפות', 'כמות', 'מחיר יח׳', 'סה״כ', 'נקנה', 'חנות', 'קישור', 'הערות'];
-  const itemRows = items.map((i) => [
+  const itemRow = (i: PlanItem) => [
     i.name, roomName(i.roomId), i.category, i.status, i.priority, i.quantity,
-    i.price, itemTotal(i), i.bought ? 'כן' : 'לא', i.store, i.link, i.notes,
-  ]);
-  const itemData = [itemHeaders, ...itemRows];
-  const ws2 = XLSX.utils.aoa_to_sheet(itemData);
-  autoWidth(ws2, itemData);
-  moneyCols(ws2, itemRows.length, ['G', 'H']);
-  XLSX.utils.book_append_sheet(wb, ws2, 'כל הפריטים');
-
-  // Sheet 3: Missing items
-  const missing = items.filter((i) => i.status === 'חסר');
-  const misRows = missing.map((i) => [
-    i.name, roomName(i.roomId), i.priority, i.quantity, i.price, itemTotal(i), i.store,
-  ]);
-  const misData = [
-    ['פריט', 'חדר', 'עדיפות', 'כמות', 'מחיר יח׳', 'סה״כ', 'חנות'],
-    ...misRows,
-    ['', '', '', '', 'סה״כ', missing.reduce((s, i) => s + itemTotal(i), 0), ''],
+    itemPlanned(i), itemActual(i), itemPaid(i), itemRemaining(i), itemPaymentStatus(i),
+    i.supplier, i.store, i.link, i.notes,
   ];
-  const ws3 = XLSX.utils.aoa_to_sheet(misData);
-  autoWidth(ws3, misData);
-  moneyCols(ws3, misRows.length + 1, ['E', 'F']);
-  XLSX.utils.book_append_sheet(wb, ws3, 'פריטים חסרים');
+  const itemHeaders = ['פריט', 'חדר', 'קטגוריה', 'סטטוס', 'עדיפות', 'כמות', 'מתוכנן', 'בפועל', 'שולם', 'נשאר', 'סטטוס תשלום', 'ספק', 'חנות', 'קישור', 'הערות'];
+  const moneyAt = (ws: XLSX.WorkSheet, n: number, cols: string[]) => moneyCols(ws, n, cols);
 
-  // Sheet 4: Budget by room
-  const byRoomData: unknown[][] = [
-    ['חדר', 'עלות מתוכננת', 'כבר נקנה', 'עוד חסר'],
-    ...rooms.map((r) => {
-      const s = getRoomStats(r, items);
-      return [r.name, s.estimatedCost, s.spentCost, s.missingCost];
-    }),
-    ['סה״כ', summary.totalEstimated, summary.totalSpent, summary.totalMissingCost],
-  ];
-  const ws4 = XLSX.utils.aoa_to_sheet(byRoomData);
-  autoWidth(ws4, byRoomData);
-  moneyCols(ws4, rooms.length + 1, ['B', 'C', 'D']);
-  XLSX.utils.book_append_sheet(wb, ws4, 'תקציב לפי חדר');
-
-  // Sheet 5: Budget by priority
-  const byPrioData: unknown[][] = [
-    ['עדיפות', 'מספר פריטים', 'עלות'],
-    ['חובה', summary.byPriority['חובה'].count, summary.byPriority['חובה'].cost],
-    ['חשוב', summary.byPriority['חשוב'].count, summary.byPriority['חשוב'].cost],
-    ['נחמד שיהיה', summary.byPriority['נחמד שיהיה'].count, summary.byPriority['נחמד שיהיה'].cost],
-  ];
-  const ws5 = XLSX.utils.aoa_to_sheet(byPrioData);
-  autoWidth(ws5, byPrioData);
-  moneyCols(ws5, 3, ['C']);
-  XLSX.utils.book_append_sheet(wb, ws5, 'תקציב לפי עדיפות');
-
-  // Sheet 6: Totals
-  const totalsData: unknown[][] = [
-    ['סיכום כללי', ''],
-    ['', ''],
+  // Sheet 1: סיכום כללי
+  const sumData: unknown[][] = [
+    ['סיכום כללי', ''], ['', ''],
     ['סגנון', style.style || '—'],
-    ['תקציב כולל', style.budget],
-    ['עלות מתוכננת', summary.totalEstimated],
-    ['נותר בתקציב', summary.remaining],
-    ['כבר נקנה', summary.totalSpent],
-    ['עוד חסר', summary.totalMissingCost],
+    ['תקציב כולל (אופציונלי)', style.budget],
+    ['עלות כוללת בפועל', summary.totalActual],
+    ['  מתוכה ריהוט ומוצרים', summary.furnitureTotal],
+    ['  מתוכה קבלן ושיפוץ', summary.contractorTotal],
+    ['שולם עד כה', summary.totalPaid],
+    ['נשאר לשלם', summary.totalRemaining],
+    ['נותר בתקציב', summary.budgetDiff],
+    ['ציון בריאות תקציב', summary.healthScore + ' / 100'],
     ['', ''],
     ['מספר חדרים', summary.totalRooms],
     ['שטח כולל (מ״ר)', summary.totalAreaM2],
     ['מספר פריטים', summary.totalItems],
-    ['מוכנות כללית', summary.readiness / 100],
   ];
-  const ws6 = XLSX.utils.aoa_to_sheet(totalsData);
-  ['B4', 'B5', 'B6', 'B7', 'B8'].forEach((ref) => { if (ws6[ref]) ws6[ref].z = shekelFmt; });
-  if (ws6['B13']) ws6['B13'].z = '0%';
-  ws6['!cols'] = [{ wch: 22 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, ws6, 'סיכום');
+  const ws1 = XLSX.utils.aoa_to_sheet(sumData);
+  ['B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10'].forEach((ref) => { if (ws1[ref]) ws1[ref].z = shekelFmt; });
+  ws1['!cols'] = [{ wch: 26 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws1, 'סיכום כללי');
+
+  // Sheet 2: תקציב לפי חדרים
+  const roomData: unknown[][] = [
+    ['חדר', 'עדיפות', 'תקציב מתוכנן', 'עלות בפועל', 'שולם', 'נשאר לשלם', 'הפרש', 'סטטוס', 'מ״ר', 'הערות'],
+    ...rooms.map((r) => {
+      const s = getRoomStats(r, items);
+      return [r.name, r.priority, s.plannedBudget, s.actualCost, s.paid, s.remaining, s.diff, s.budgetStatus, roomAreaM2(r), r.notes];
+    }),
+    ['סה״כ', '', rooms.reduce((a, r) => a + (r.plannedBudget || 0), 0), summary.totalActual, summary.totalPaid, summary.totalRemaining, '', '', summary.totalAreaM2, ''],
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(roomData);
+  autoWidth(ws2, roomData);
+  moneyAt(ws2, rooms.length + 1, ['C', 'D', 'E', 'F', 'G']);
+  XLSX.utils.book_append_sheet(wb, ws2, 'תקציב לפי חדרים');
+
+  // Sheet 3: מוצרים וריהוט (non-contractor)
+  const furniture = items.filter((i) => !CONTRACTOR_CATEGORIES.has(i.category));
+  const furnData = [itemHeaders, ...furniture.map(itemRow)];
+  const ws3 = XLSX.utils.aoa_to_sheet(furnData);
+  autoWidth(ws3, furnData);
+  moneyAt(ws3, furniture.length, ['G', 'H', 'I', 'J']);
+  XLSX.utils.book_append_sheet(wb, ws3, 'מוצרים וריהוט');
+
+  // Sheet 4: עלויות קבלן ושיפוץ
+  const contractor = items.filter((i) => CONTRACTOR_CATEGORIES.has(i.category));
+  const conData = [itemHeaders, ...contractor.map(itemRow)];
+  const ws4 = XLSX.utils.aoa_to_sheet(conData);
+  autoWidth(ws4, conData);
+  moneyAt(ws4, contractor.length, ['G', 'H', 'I', 'J']);
+  XLSX.utils.book_append_sheet(wb, ws4, 'עלויות קבלן ושיפוץ');
+
+  // Sheet 5: חומרי גלם
+  const raw = items.filter((i) => i.category === 'חומרי גלם');
+  const rawData = [itemHeaders, ...raw.map(itemRow)];
+  const ws5 = XLSX.utils.aoa_to_sheet(rawData);
+  autoWidth(ws5, rawData);
+  moneyAt(ws5, raw.length, ['G', 'H', 'I', 'J']);
+  XLSX.utils.book_append_sheet(wb, ws5, 'חומרי גלם');
+
+  // Sheet 6: חסרים
+  const missing = items.filter((i) => i.status === 'חסר' || i.status === 'צריך לקנות');
+  const misData = [itemHeaders, ...missing.map(itemRow),
+    ['סה״כ', '', '', '', '', '', '', missing.reduce((s, i) => s + itemActual(i), 0), '', '', '', '', '', '', '']];
+  const ws6 = XLSX.utils.aoa_to_sheet(misData);
+  autoWidth(ws6, misData);
+  moneyAt(ws6, missing.length + 1, ['G', 'H', 'I', 'J']);
+  XLSX.utils.book_append_sheet(wb, ws6, 'חסרים');
+
+  // Sheet 7: שולם / נשאר לתשלום
+  const payData = [
+    ['פריט', 'חדר', 'ספק', 'עלות בפועל', 'שולם', 'נשאר', 'סטטוס תשלום'],
+    ...items.filter((i) => itemActual(i) > 0).map((i) => [
+      i.name, roomName(i.roomId), i.supplier, itemActual(i), itemPaid(i), itemRemaining(i), itemPaymentStatus(i),
+    ]),
+    ['סה״כ', '', '', summary.totalActual, summary.totalPaid, summary.totalRemaining, ''],
+  ];
+  const ws7 = XLSX.utils.aoa_to_sheet(payData);
+  autoWidth(ws7, payData);
+  moneyAt(ws7, payData.length - 1, ['D', 'E', 'F']);
+  XLSX.utils.book_append_sheet(wb, ws7, 'שולם ונשאר לתשלום');
 
   XLSX.writeFile(wb, `תכנון-דירה-${new Date().toISOString().split('T')[0]}.xlsx`);
 }

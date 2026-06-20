@@ -1,5 +1,5 @@
 import { Room, PlanItem, StyleProfile } from './types';
-import { getPlanSummary, getRoomStats, fmt, itemTotal } from './geometry';
+import { getPlanSummary, getRoomStats, fmt, itemTotal, itemPaid, itemActual } from './geometry';
 
 // ── "יועץ הדירה" — the in-app apartment advisor ──────────────────────────────
 // MVP uses local, deterministic logic that computes genuinely useful insights
@@ -17,8 +17,9 @@ export const SUGGESTED_QUESTIONS: string[] = [
   'מה התקציב הכולל?',
   'מה הכי חשוב לכם במטבח?',
   'מה כבר קניתם?',
+  'כמה שילמתם על נגרות?',
+  'כמה נשאר לשלם?',
   'מה אפשר לוותר עליו?',
-  'איך תיראה הדירה?',
   'במה כדאי להתחיל?',
   'האם אנחנו בתקציב?',
 ];
@@ -48,14 +49,14 @@ export function mockAdvisor(message: string, ctx: AdvisorContext): string {
     }
     const lines = [
       `התקציב שהגדרתם: ${fmt(style.budget)}.`,
-      `כרגע מתוכננת הוצאה של ${fmt(summary.totalEstimated)} (ללא פריטים שסומנו "לא צריך").`,
+      `העלות בפועל כרגע: ${fmt(summary.totalActual)} (ריהוט ${fmt(summary.furnitureTotal)} · קבלן ${fmt(summary.contractorTotal)}).`,
     ];
-    if (summary.remaining < 0) {
-      lines.push(`⚠️ אתם חורגים ב-${fmt(Math.abs(summary.remaining))}. הייתי ממליץ לעבור על פריטי "נחמד שיהיה" (${summary.byPriority['נחמד שיהיה'].count} פריטים, ${fmt(summary.byPriority['נחמד שיהיה'].cost)}) ולדחות חלק מהם.`);
+    if (summary.budgetDiff < 0) {
+      lines.push(`⚠️ אתם חורגים ב-${fmt(Math.abs(summary.budgetDiff))}. הייתי ממליץ לעבור על פריטי "נחמד שיהיה" (${summary.byPriority['נחמד שיהיה'].count} פריטים, ${fmt(summary.byPriority['נחמד שיהיה'].cost)}) ולדחות חלק מהם.`);
     } else {
-      lines.push(`✅ נשארו לכם ${fmt(summary.remaining)} בתקציב. יש מרחב נשימה, אבל שמרו רזרבה של ~10% להפתעות.`);
+      lines.push(`✅ נשארו לכם ${fmt(summary.budgetDiff)} בתקציב. יש מרחב נשימה, אבל שמרו רזרבה של ~10% להפתעות.`);
     }
-    lines.push(`מתוך זה כבר נרכש: ${fmt(summary.totalSpent)}, ועוד ${fmt(summary.totalMissingCost)} בפריטים שמסומנים כחסרים.`);
+    lines.push(`כבר שולם: ${fmt(summary.totalPaid)}, נשאר לשלם: ${fmt(summary.totalRemaining)}. ציון בריאות תקציב: ${summary.healthScore}/100.`);
     return lines.join('\n');
   }
 
@@ -70,9 +71,9 @@ export function mockAdvisor(message: string, ctx: AdvisorContext): string {
 
   // "What did we already buy"
   if (startsWithAny(t, ['קנינו', 'כבר קניתי', 'כבר קנינו', 'יש לנו', 'מה קנינו'])) {
-    const owned = items.filter((i) => i.status === 'יש לנו' || i.bought);
+    const owned = items.filter((i) => i.status === 'בבעלותי' || i.bought);
     if (owned.length === 0) {
-      return 'עדיין לא סימנתם פריטים כ"יש לנו". כשתתחילו לסמן, אעזור לכם להבין מה כבר מכוסה ומה עוד חסר.';
+      return 'עדיין לא סימנתם פריטים כ"בבעלותי". כשתתחילו לסמן, אעזור לכם להבין מה כבר מכוסה ומה עוד חסר.';
     }
     const top = owned.slice(0, 8).map((i) => `• ${i.emoji} ${i.name}`).join('\n');
     return `כבר יש לכם ${owned.length} פריטים, בשווי ${fmt(owned.reduce((s, i) => s + itemTotal(i), 0))}:\n${top}${owned.length > 8 ? '\n…ועוד' : ''}\nכל הכבוד, זו התחלה טובה! רוצים שאבדוק מה החובה שעוד חסר?`;
@@ -102,12 +103,28 @@ export function mockAdvisor(message: string, ctx: AdvisorContext): string {
     const kitchen = rooms.find((r) => r.name.includes('מטבח'));
     if (!kitchen) return 'עוד לא הוספתם מטבח לתוכנית. במטבח הייתי ממליץ להתחיל מהדברים הגדולים: מקרר, תנור/כיריים, מדיח, ופינת אוכל. רוצים שאוסיף חדר מטבח?';
     const ks = getRoomStats(kitchen, items);
-    return `במטבח (${ks.area} מ״ר) יש כרגע ${ks.total} פריטים: ${ks.have} יש לכם, ${ks.missing} חסרים. עלות מתוכננת ${fmt(ks.estimatedCost)}.\nסדר עדיפויות שאני ממליץ: 1) מקרר 2) תנור/כיריים 3) מדיח 4) כלי בישול בסיסיים 5) שדרוגים. מה מתוך אלה כבר יש לכם?`;
+    const budgetLine = ks.plannedBudget > 0
+      ? ` תקציב ${fmt(ks.plannedBudget)}, בפועל ${fmt(ks.actualCost)} (${ks.budgetStatus}).`
+      : ` עלות בפועל ${fmt(ks.actualCost)}.`;
+    return `במטבח (${ks.area} מ״ר) יש ${ks.total} פריטים: ${ks.owned} בבעלותכם, ${ks.missing + ks.toBuy} עוד צריך.${budgetLine}\nשולם עד כה ${fmt(ks.paid)}, נשאר ${fmt(ks.remaining)}.\nסדר עדיפויות מומלץ: נגרות → שיש → מקרר → תנור/כיריים → מדיח → התקנות.`;
+  }
+
+  // Payment questions ("how much did we pay for X", "how much left to pay")
+  if (startsWithAny(t, ['שילמתם', 'שילמנו', 'שולם', 'נשאר לשלם', 'כמה נשאר', 'תשלום', 'תשלומים', 'נגרות'])) {
+    // try to match a category/supplier mentioned in the question
+    const match = items.filter((i) => (i.category && t.includes(i.category)) || (i.supplier && t.includes(i.supplier)) || (i.name && t.includes(i.name)));
+    if (match.length) {
+      const paid = match.reduce((s, i) => s + itemPaid(i), 0);
+      const actual = match.reduce((s, i) => s + itemActual(i), 0);
+      const rem = Math.max(0, actual - paid);
+      return `על ${match.map((i) => i.name).slice(0, 3).join(', ')}: עלות ${fmt(actual)}, שולם ${fmt(paid)}, נשאר לשלם ${fmt(rem)}.`;
+    }
+    return `סך התשלומים: שולם ${fmt(summary.totalPaid)} מתוך ${fmt(summary.totalActual)} (${summary.paidPct}%). נשאר לשלם ${fmt(summary.totalRemaining)}.\nרוצים פירוט לפי חדר או לפי קבלן?`;
   }
 
   // "Where to start"
   if (startsWithAny(t, ['להתחיל', 'מאיפה', 'במה כדאי', 'ראשון', 'קודם'])) {
-    const mustMissing = items.filter((i) => i.status === 'חסר' && i.priority === 'חובה');
+    const mustMissing = items.filter((i) => (i.status === 'חסר' || i.status === 'צריך לקנות') && i.priority === 'חובה');
     if (mustMissing.length === 0) {
       return 'כל פריטי החובה כבר מכוסים — מצוין! עכשיו אפשר לעבור ל"חשוב" ואז ל"נחמד שיהיה". רוצים שאעבור חדר-חדר?';
     }

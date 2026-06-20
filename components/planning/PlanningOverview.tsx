@@ -7,8 +7,9 @@ import { emptyPlan } from '@/lib/planning/types';
 import ProgressBar from '@/components/ProgressBar';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import {
-  Home, Ruler, Wallet, Package, Sparkles, FileSpreadsheet,
-  Download, Upload, RotateCcw, Database,
+  Wallet, Package, Sparkles, FileSpreadsheet,
+  Download, Upload, RotateCcw, Database, Activity, HardHat, Sofa,
+  CheckCircle2, Clock, AlertTriangle,
 } from 'lucide-react';
 
 const STYLES = ['מודרני', 'סקנדינבי', 'כפרי', 'תעשייתי', 'בוהו', 'קלאסי', 'מינימליסטי'];
@@ -85,49 +86,85 @@ export default function PlanningOverview() {
         </div>
       </div>
 
-      {/* Summary stats */}
+      {/* Money stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {stat(<Home size={18} className="text-violet-600" />, 'חדרים', String(summary.totalRooms), 'rgba(139,92,246,0.15)')}
-        {stat(<Ruler size={18} className="text-blue-600" />, 'שטח כולל', `${summary.totalAreaM2} מ״ר`, 'rgba(59,130,246,0.15)')}
-        {stat(<Package size={18} className="text-amber-600" />, 'פריטים', String(summary.totalItems), 'rgba(245,158,11,0.18)')}
-        {stat(<Sparkles size={18} className="text-emerald-600" />, 'מוכנות', `${summary.readiness}%`, 'rgba(34,197,94,0.15)')}
+        {stat(<Wallet size={18} className="text-amber-600" />, 'עלות כוללת', fmt(summary.totalActual), 'rgba(245,158,11,0.18)')}
+        {stat(<CheckCircle2 size={18} className="text-emerald-600" />, 'שולם', fmt(summary.totalPaid), 'rgba(34,197,94,0.15)')}
+        {stat(<Clock size={18} className="text-red-600" />, 'נשאר לשלם', fmt(summary.totalRemaining), 'rgba(239,68,68,0.13)')}
+        {stat(<Activity size={18} className="text-violet-600" />, 'בריאות תקציב', `${summary.healthScore}/100`, 'rgba(139,92,246,0.15)')}
       </div>
 
-      {/* Budget */}
+      {/* Budget health */}
       <div className="glass-card rounded-3xl p-5">
         <div className="flex items-center gap-2 mb-3">
           <Wallet size={18} className="text-amber-500" />
-          <h2 className="font-bold text-stone-800">תקציב התכנון</h2>
+          <h2 className="font-bold text-stone-800">בריאות התקציב</h2>
         </div>
-        {style.budget > 0 ? (
+        {summary.globalBudget > 0 ? (
           <>
             <div className="flex justify-between items-end mb-2">
               <div>
-                <p className="text-xs text-stone-500">מתוכנן מתוך {fmt(style.budget)}</p>
-                <p className="text-2xl font-bold text-stone-900">{fmt(summary.totalEstimated)}</p>
+                <p className="text-xs text-stone-500">מתוך תקציב כולל {fmt(summary.globalBudget)}</p>
+                <p className="text-2xl font-bold text-stone-900">{fmt(summary.totalActual)}</p>
               </div>
-              <p className={`font-bold ${summary.remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                {summary.remaining < 0 ? `חריגה ${fmt(Math.abs(summary.remaining))}` : `נותר ${fmt(summary.remaining)}`}
+              <p className={`font-bold ${summary.budgetDiff < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {summary.budgetDiff < 0 ? `חריגה ${fmt(-summary.budgetDiff)}` : `נותר ${fmt(summary.budgetDiff)}`}
               </p>
             </div>
-            <ProgressBar value={style.budget > 0 ? Math.round((summary.totalEstimated / style.budget) * 100) : 0}
-              color={summary.remaining < 0 ? 'red' : 'amber'} />
+            <ProgressBar value={Math.round((summary.totalActual / summary.globalBudget) * 100)} color={summary.overBudget ? 'red' : 'amber'} />
           </>
         ) : (
-          <p className="text-stone-400 text-sm">הגדירו תקציב כולל למעלה כדי לראות מעקב חריגות.</p>
+          <p className="text-stone-400 text-sm">תקציב כולל אופציונלי — כל פריט מתווסף אוטומטית לסה״כ הדירה ({fmt(summary.totalActual)}).</p>
         )}
 
-        {/* by priority */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          {(['חובה', 'חשוב', 'נחמד שיהיה'] as const).map((p) => (
-            <div key={p} className="rounded-2xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.5)' }}>
-              <p className="text-[11px] text-stone-500">{p}</p>
-              <p className="font-bold text-stone-800 text-sm">{fmt(summary.byPriority[p].cost)}</p>
-              <p className="text-[10px] text-stone-400">{summary.byPriority[p].count} פריטים</p>
-            </div>
-          ))}
+        {/* furniture vs contractor */}
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <div className="rounded-2xl p-3" style={{ background: 'rgba(59,130,246,0.08)' }}>
+            <div className="flex items-center gap-1.5 text-xs text-blue-600 font-medium"><Sofa size={14} /> ריהוט ומוצרים</div>
+            <p className="font-bold text-stone-800">{fmt(summary.furnitureTotal)}</p>
+          </div>
+          <div className="rounded-2xl p-3" style={{ background: 'rgba(139,92,246,0.08)' }}>
+            <div className="flex items-center gap-1.5 text-xs text-violet-600 font-medium"><HardHat size={14} /> קבלן ושיפוץ</div>
+            <p className="font-bold text-stone-800">{fmt(summary.contractorTotal)}</p>
+          </div>
         </div>
+
+        {/* over-budget warnings */}
+        {summary.overBudgetRooms.length > 0 && (
+          <div className="mt-3 rounded-2xl p-3 flex items-start gap-2" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)' }}>
+            <AlertTriangle size={15} className="text-red-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-700">
+              חדרים בחריגה: {summary.overBudgetRooms.map((r) => `${r.name} (+${fmt(r.over)})`).join(' · ')}
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* By category */}
+      {summary.byCategory.length > 0 && (
+        <div className="glass-card rounded-3xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Package size={18} className="text-amber-500" />
+            <h2 className="font-bold text-stone-800">פירוט לפי קטגוריה</h2>
+          </div>
+          <div className="space-y-2">
+            {summary.byCategory.slice(0, 12).map((c) => {
+              const maxA = summary.byCategory[0].actual || 1;
+              return (
+                <div key={c.category}>
+                  <div className="flex justify-between text-xs mb-0.5">
+                    <span className="text-stone-600">{c.category} <span className="text-stone-400">({c.count})</span></span>
+                    <span className="font-semibold text-stone-700">{fmt(c.actual)}{c.paid > 0 && <span className="text-emerald-600 font-normal"> · שולם {fmt(c.paid)}</span>}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-stone-200 overflow-hidden">
+                    <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.round((c.actual / maxA) * 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Data management */}
       <div className="glass-card rounded-3xl p-5 space-y-3">

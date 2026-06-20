@@ -2,26 +2,40 @@
 import { useState } from 'react';
 import { usePlanningStore } from '@/lib/planning/store';
 import { Room, PlanItem, ROOM_PRESETS } from '@/lib/planning/types';
-import { getRoomStats, fmt, itemTotal } from '@/lib/planning/geometry';
+import { getRoomStats, fmt, itemActual, itemPaid, itemRemaining, itemPaymentStatus } from '@/lib/planning/geometry';
 import ProgressBar from '@/components/ProgressBar';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import RoomModal from './RoomModal';
 import PlanItemModal, { PlanItemDraft } from './PlanItemModal';
 import {
   Plus, Pencil, Trash2, ChevronDown, ChevronUp, MapPin, MapPinOff,
-  Check, ExternalLink,
+  Check, ExternalLink, AlertTriangle,
 } from 'lucide-react';
 
 const statusColor: Record<string, string> = {
-  'יש לנו': 'bg-emerald-100 text-emerald-700',
+  'בבעלותי': 'bg-emerald-100 text-emerald-700',
+  'צריך לקנות': 'bg-amber-100 text-amber-700',
   'חסר': 'bg-red-100 text-red-700',
-  'אולי': 'bg-amber-100 text-amber-700',
+  'אולי': 'bg-violet-100 text-violet-700',
   'לא צריך': 'bg-stone-100 text-stone-500',
 };
 const prioColor: Record<string, string> = {
   'חובה': 'bg-red-100 text-red-700',
   'חשוב': 'bg-amber-100 text-amber-700',
   'נחמד שיהיה': 'bg-stone-100 text-stone-500',
+};
+const payColor: Record<string, string> = {
+  'לא שולם': 'text-stone-400',
+  'שולם חלקית': 'text-amber-600',
+  'שולם במלואו': 'text-emerald-600',
+  'חורג מהתקציב': 'text-red-600',
+};
+const budgetStatusStyle: Record<string, string> = {
+  'עומד בתקציב': 'bg-emerald-100 text-emerald-700',
+  'קרוב לחריגה': 'bg-amber-100 text-amber-700',
+  'חורג מהתקציב': 'bg-red-100 text-red-700',
+  'שולם מלא': 'bg-blue-100 text-blue-700',
+  'בתהליך': 'bg-stone-100 text-stone-600',
 };
 
 export default function RoomsManager() {
@@ -80,6 +94,8 @@ export default function RoomsManager() {
       {rooms.map((room) => {
         const stats = getRoomStats(room, items);
         const isOpen = expanded[room.id];
+        const hasBudget = stats.plannedBudget > 0;
+        const over = hasBudget && stats.actualCost > stats.plannedBudget;
         return (
           <div key={room.id} className="glass-card rounded-3xl overflow-hidden">
             <div className="p-4">
@@ -92,6 +108,7 @@ export default function RoomsManager() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-stone-900">{room.name}</span>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${prioColor[room.priority]}`}>{room.priority}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${budgetStatusStyle[stats.budgetStatus]}`}>{stats.budgetStatus}</span>
                     </div>
                     <p className="text-xs text-stone-400">{stats.area} מ״ר · {(room.width / 100).toFixed(1)}×{(room.length / 100).toFixed(1)} מ׳</p>
                   </div>
@@ -102,19 +119,38 @@ export default function RoomsManager() {
                 </div>
               </div>
 
-              <div className="mt-3">
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-stone-500">מוכנות החדר</span>
-                  <span className="font-semibold text-stone-700">{stats.readiness}%</span>
+              {/* Budget block */}
+              <div className="mt-3 rounded-2xl p-3" style={{ background: over ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.5)' }}>
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="text-stone-500">
+                    {hasBudget ? <>תקציב {fmt(stats.plannedBudget)}</> : 'ללא תקציב מוגדר'}
+                  </span>
+                  <span className={`font-semibold ${over ? 'text-red-600' : 'text-stone-700'}`}>
+                    בפועל {fmt(stats.actualCost)}
+                  </span>
                 </div>
-                <ProgressBar value={stats.readiness} color={stats.readiness < 50 ? 'red' : stats.readiness < 80 ? 'amber' : 'green'} height="sm" />
+                {hasBudget && <ProgressBar value={stats.usedPct} color={over ? 'red' : stats.usedPct >= 90 ? 'amber' : 'green'} height="sm" />}
+                <div className="flex items-center gap-3 mt-2 text-[11px] flex-wrap">
+                  <span className="text-emerald-600 font-medium">שולם {fmt(stats.paid)}</span>
+                  <span className="text-amber-600 font-medium">נשאר {fmt(stats.remaining)}</span>
+                  {hasBudget && (
+                    <span className={stats.diff < 0 ? 'text-red-600 font-medium' : 'text-stone-500'}>
+                      {stats.diff < 0 ? `חריגה ${fmt(-stats.diff)}` : `פנוי ${fmt(stats.diff)}`}
+                    </span>
+                  )}
+                </div>
+                {over && (
+                  <div className="flex items-center gap-1 mt-1.5 text-[11px] text-red-600 font-medium">
+                    <AlertTriangle size={12} /> החדר חורג מהתקציב המתוכנן
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3 mt-3 text-xs flex-wrap">
-                <span className="text-emerald-600 font-medium">יש לנו {stats.have}</span>
+                <span className="text-emerald-600 font-medium">בבעלותי {stats.owned}</span>
+                <span className="text-amber-600 font-medium">לקנות {stats.toBuy}</span>
                 <span className="text-red-500 font-medium">חסר {stats.missing}</span>
-                <span className="text-amber-600 font-medium">אולי {stats.maybe}</span>
-                <span className="text-stone-500">עלות {fmt(stats.estimatedCost)}</span>
+                <span className="text-stone-500">מוכנות {stats.readiness}%</span>
               </div>
 
               <div className="flex items-center gap-2 mt-3">
@@ -132,32 +168,40 @@ export default function RoomsManager() {
 
             {isOpen && stats.items.length > 0 && (
               <div className="border-t border-white/60 divide-y divide-white/50">
-                {stats.items.map((it) => (
-                  <div key={it.id} className="flex items-center gap-2 px-4 py-2.5">
-                    <button onClick={() => toggleBought(it.id)}
-                      className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${it.bought ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-stone-300 text-transparent hover:border-emerald-400'}`}>
-                      <Check size={13} />
-                    </button>
-                    <span className="text-base shrink-0">{it.emoji}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-sm font-medium ${it.bought ? 'line-through text-stone-400' : 'text-stone-800'}`}>{it.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusColor[it.status]}`}>{it.status}</span>
-                        {it.link && <a href={it.link} target="_blank" rel="noopener noreferrer" className="text-amber-500"><ExternalLink size={11} /></a>}
+                {stats.items.map((it) => {
+                  const ps = itemPaymentStatus(it);
+                  return (
+                    <div key={it.id} className="flex items-center gap-2 px-4 py-2.5">
+                      <button onClick={() => toggleBought(it.id)}
+                        className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-colors ${it.bought ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-stone-300 text-transparent hover:border-emerald-400'}`}>
+                        <Check size={13} />
+                      </button>
+                      <span className="text-base shrink-0">{it.emoji}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-sm font-medium ${it.bought ? 'line-through text-stone-400' : 'text-stone-800'}`}>{it.name}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${statusColor[it.status]}`}>{it.status}</span>
+                          {it.category && <span className="text-[10px] text-stone-400">{it.category}</span>}
+                          {it.link && <a href={it.link} target="_blank" rel="noopener noreferrer" className="text-amber-500"><ExternalLink size={11} /></a>}
+                        </div>
+                        <p className="text-[11px] text-stone-400">
+                          {it.quantity > 1 ? `${it.quantity}× ` : ''}{itemActual(it) > 0 ? fmt(itemActual(it)) : 'ללא מחיר'}
+                          {itemPaid(it) > 0 && <> · שולם {fmt(itemPaid(it))}</>}
+                          {itemRemaining(it) > 0 && itemActual(it) > 0 && <> · נשאר {fmt(itemRemaining(it))}</>}
+                          {it.supplier ? ` · ${it.supplier}` : ''}
+                          {' · '}<span className={`font-medium ${payColor[ps]}`}>{ps}</span>
+                        </p>
                       </div>
-                      <p className="text-[11px] text-stone-400">
-                        {it.quantity > 1 ? `${it.quantity}× ` : ''}{it.price > 0 ? fmt(itemTotal(it)) : 'ללא מחיר'}{it.store ? ` · ${it.store}` : ''}
-                      </p>
+                      <button onClick={() => (it.placed ? unplaceItem(it.id) : placeItem(it.id, Math.round(room.width / 2), Math.round(room.length / 2)))}
+                        title={it.placed ? 'הסר מהתוכנית' : 'הצב בתוכנית'}
+                        className={`p-1.5 rounded-lg shrink-0 ${it.placed ? 'text-amber-600 bg-amber-50' : 'text-stone-300 hover:text-amber-500'}`}>
+                        {it.placed ? <MapPin size={14} /> : <MapPinOff size={14} />}
+                      </button>
+                      <button onClick={() => setItemModal({ open: true, item: it })} className="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 shrink-0"><Pencil size={13} /></button>
+                      <button onClick={() => setConfirmDel({ kind: 'item', id: it.id, name: it.name })} className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 shrink-0"><Trash2 size={13} /></button>
                     </div>
-                    <button onClick={() => (it.placed ? unplaceItem(it.id) : placeItem(it.id, Math.round(room.width / 2), Math.round(room.length / 2)))}
-                      title={it.placed ? 'הסר מהתוכנית' : 'הצב בתוכנית'}
-                      className={`p-1.5 rounded-lg shrink-0 ${it.placed ? 'text-amber-600 bg-amber-50' : 'text-stone-300 hover:text-amber-500'}`}>
-                      {it.placed ? <MapPin size={14} /> : <MapPinOff size={14} />}
-                    </button>
-                    <button onClick={() => setItemModal({ open: true, item: it })} className="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 shrink-0"><Pencil size={13} /></button>
-                    <button onClick={() => setConfirmDel({ kind: 'item', id: it.id, name: it.name })} className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 shrink-0"><Trash2 size={13} /></button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
