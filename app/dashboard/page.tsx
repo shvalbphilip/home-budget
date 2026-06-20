@@ -1,50 +1,51 @@
 'use client';
-import { useStore } from '@/lib/store';
-import { getDashboardStats, getCategoryStats, fmt } from '@/lib/utils';
+import { useEffect } from 'react';
+import { usePlanningStore } from '@/lib/planning/store';
+import { getPlanSummary, getRoomStats, itemActual, fmt } from '@/lib/planning/geometry';
 import StatCard from '@/components/StatCard';
 import ProgressBar from '@/components/ProgressBar';
 import AlertBanner from '@/components/AlertBanner';
-import { Wallet, ShoppingBag, CheckCircle, AlertCircle, TrendingDown, Package, Home, Boxes, ChevronLeft } from 'lucide-react';
+import { Wallet, CheckCircle, AlertCircle, TrendingDown, Package, Home, Boxes, ChevronLeft, Clock, Activity } from 'lucide-react';
 import Link from 'next/link';
 
+const budgetStatusStyle: Record<string, string> = {
+  'עומד בתקציב': 'bg-emerald-100 text-emerald-700',
+  'קרוב לחריגה': 'bg-amber-100 text-amber-700',
+  'חורג מהתקציב': 'bg-red-100 text-red-700',
+  'שולם מלא': 'bg-blue-100 text-blue-700',
+  'בתהליך': 'bg-stone-100 text-stone-600',
+};
+
 export default function Dashboard() {
-  const { items, totalBudget, categories } = useStore();
-  const stats = getDashboardStats(items, totalBudget, categories);
-  const catStats = getCategoryStats(items, categories);
+  const { loaded, load, rooms, items, style } = usePlanningStore();
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+
+  const summary = getPlanSummary(rooms, items, style.budget);
 
   const alerts = [
-    ...stats.overBudgetCats.map((c) => ({
-      type: 'error' as const,
-      message: `חריגה מתקציב בקטגוריה: ${c.name}`,
-    })),
-    ...stats.noBudgetCats.map((c) => ({
-      type: 'warning' as const,
-      message: `לא הוגדר תקציב לקטגוריה: ${c.name}`,
-    })),
-    ...(stats.criticalMissing > 0
-      ? [{ type: 'error' as const, message: `${stats.criticalMissing} פריטים קריטיים חסרים בעדיפות גבוהה` }]
-      : []),
+    ...summary.overBudgetRooms.map((r) => ({ type: 'error' as const, message: `חריגה מתקציב בחדר: ${r.name} (+${fmt(r.over)})` })),
+    ...(summary.overBudget ? [{ type: 'error' as const, message: `חריגה מהתקציב הכולל: ${fmt(-summary.budgetDiff)}` }] : []),
   ];
 
-  const incompleteRooms = catStats.filter((c) => c.completion < 100 && c.total > 0).sort((a, b) => a.completion - b.completion);
-  const highPriorityMissing = items.filter((i) => (i.status === 'חסר' || i.status === 'לרכישה') && i.priority === 'גבוהה').slice(0, 5);
+  const highPriorityMissing = items
+    .filter((i) => (i.status === 'חסר' || i.status === 'צריך לקנות') && i.priority === 'חובה')
+    .slice(0, 5);
 
-  if (items.length === 0 && categories.length === 0) {
+  if (!loaded) {
+    return <div className="min-h-[60vh] flex items-center justify-center"><div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  if (rooms.length === 0 && items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] text-center p-6">
         <div className="w-20 h-20 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
           <Home size={40} className="text-amber-500" />
         </div>
-        <h1 className="text-2xl font-bold text-stone-900 mb-2">הפרויקט ריק</h1>
-        <p className="text-stone-500 mb-6 max-w-sm">התחל בהוספת חדרים/קטגוריות ואז הוסף את הפריטים שלך</p>
-        <div className="flex gap-3">
-          <Link href="/categories" className="bg-amber-500 text-white px-5 py-3 rounded-xl font-semibold hover:bg-amber-600 transition-colors">
-            הוסף חדרים
-          </Link>
-          <Link href="/add-item" className="bg-white border border-stone-200 text-stone-700 px-5 py-3 rounded-xl font-semibold hover:bg-stone-50 transition-colors">
-            הוסף פריט
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold text-stone-900 mb-2">בואו נתחיל לתכנן</h1>
+        <p className="text-stone-500 mb-6 max-w-sm">הוסיפו חדרים ופריטים בתכנון הדירה — התקציב יתעדכן אוטומטית.</p>
+        <Link href="/planning" className="text-white px-5 py-3 rounded-xl font-semibold" style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)' }}>
+          לתכנון הדירה
+        </Link>
       </div>
     );
   }
@@ -56,67 +57,51 @@ export default function Dashboard() {
           <h1 className="text-xl md:text-2xl font-bold text-stone-900 flex items-center gap-2">
             <Home size={22} className="text-amber-500" /> לוח בקרה
           </h1>
-          <p className="text-stone-500 text-xs md:text-sm mt-0.5">סיכום מצב המעבר לדירה</p>
+          <p className="text-stone-500 text-xs md:text-sm mt-0.5">סיכום תקציב ותכנון הדירה</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/inventory" className="glass-card px-3 py-2 rounded-xl text-sm font-semibold text-stone-600 flex items-center gap-1.5">
-            <Package size={16} /> מלאי
-          </Link>
-          <Link href="/add-item" className="md:flex hidden bg-amber-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-amber-600 transition-colors">
-            + הוסף פריט
-          </Link>
-        </div>
+        <Link href="/planning" className="glass-card px-3 py-2 rounded-xl text-sm font-semibold text-stone-600 flex items-center gap-1.5">
+          <Boxes size={16} /> תכנון
+        </Link>
       </div>
-
-      {/* Planning hero */}
-      <Link href="/planning" className="block rounded-3xl p-5 relative overflow-hidden active:scale-[0.99] transition-transform"
-        style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.92), rgba(245,158,11,0.92))', boxShadow: '0 8px 28px rgba(245,158,11,0.30)' }}>
-        <div className="relative z-10 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-white/90 text-xs font-semibold mb-1">
-              <Boxes size={15} /> חדש
-            </div>
-            <p className="text-white font-bold text-lg leading-tight">תכנון הדירה</p>
-            <p className="text-white/85 text-xs mt-0.5">תוכנית קומה, חדרים, 3D ויועץ חכם</p>
-          </div>
-          <div className="flex items-center gap-1 text-white font-semibold text-sm">
-            פתח <ChevronLeft size={18} />
-          </div>
-        </div>
-        <div className="absolute -left-6 -bottom-8 text-[110px] opacity-20 leading-none">🏠</div>
-      </Link>
 
       {alerts.length > 0 && <AlertBanner alerts={alerts} />}
 
       {/* Budget overview */}
-      {totalBudget > 0 ? (
+      {summary.globalBudget > 0 ? (
         <div className="glass-card rounded-3xl p-5">
           <div className="flex justify-between items-end mb-3">
             <div>
               <p className="text-sm text-stone-500">תקציב כולל</p>
-              <p className="text-3xl font-bold text-stone-900">{fmt(totalBudget)}</p>
+              <p className="text-3xl font-bold text-stone-900">{fmt(summary.globalBudget)}</p>
             </div>
             <div className="text-left">
-              <p className="text-xs text-stone-500">שימוש בתקציב</p>
-              <p className="text-xl font-bold text-amber-600">{stats.budgetUsedPct}%</p>
+              <p className="text-xs text-stone-500">בריאות תקציב</p>
+              <p className="text-xl font-bold text-amber-600">{summary.healthScore}/100</p>
             </div>
           </div>
-          <ProgressBar value={stats.budgetUsedPct} color={stats.budgetUsedPct > 90 ? 'red' : 'amber'} />
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="rounded-2xl p-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
-              <p className="text-xs text-red-500 font-medium">הוצאה בפועל</p>
-              <p className="text-lg font-bold text-red-700">{fmt(stats.totalSpent)}</p>
+          <ProgressBar value={Math.round((summary.totalActual / summary.globalBudget) * 100)} color={summary.overBudget ? 'red' : 'amber'} />
+          <div className="grid grid-cols-3 gap-3 mt-4">
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(245,158,11,0.10)' }}>
+              <p className="text-xs text-amber-600 font-medium">עלות כוללת</p>
+              <p className="text-lg font-bold text-stone-800">{fmt(summary.totalActual)}</p>
             </div>
-            <div className="rounded-2xl p-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
-              <p className="text-xs text-emerald-600 font-medium">נותר בתקציב</p>
-              <p className="text-lg font-bold text-emerald-700">{fmt(stats.remaining)}</p>
+            <div className="rounded-2xl p-3" style={{ background: 'rgba(34,197,94,0.08)' }}>
+              <p className="text-xs text-emerald-600 font-medium">שולם</p>
+              <p className="text-lg font-bold text-emerald-700">{fmt(summary.totalPaid)}</p>
+            </div>
+            <div className="rounded-2xl p-3" style={{ background: summary.budgetDiff < 0 ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.08)' }}>
+              <p className={`text-xs font-medium ${summary.budgetDiff < 0 ? 'text-red-500' : 'text-blue-600'}`}>{summary.budgetDiff < 0 ? 'חריגה' : 'נותר'}</p>
+              <p className={`text-lg font-bold ${summary.budgetDiff < 0 ? 'text-red-700' : 'text-blue-700'}`}>{fmt(Math.abs(summary.budgetDiff))}</p>
             </div>
           </div>
         </div>
       ) : (
         <div className="glass-amber rounded-3xl p-4 flex items-center justify-between">
-          <p className="text-amber-800 text-sm font-medium">לא הוגדר תקציב כולל</p>
-          <Link href="/budget" className="text-sm text-white px-4 py-2 rounded-2xl font-semibold transition-all active:scale-95"
+          <div>
+            <p className="text-amber-800 text-sm font-medium">עלות מתוכננת: {fmt(summary.totalActual)}</p>
+            <p className="text-amber-700/70 text-xs">תקציב כולל אופציונלי</p>
+          </div>
+          <Link href="/budget" className="text-sm text-white px-4 py-2 rounded-2xl font-semibold active:scale-95"
             style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)', boxShadow: '0 4px 12px rgba(245,158,11,0.35)' }}>
             הגדר תקציב
           </Link>
@@ -125,31 +110,35 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title="פריטים שנרכשו" value={String(stats.totalPurchased)} icon={CheckCircle} color="green" />
-        <StatCard title="פריטים חסרים" value={String(stats.totalMissing)} icon={ShoppingBag} color="amber" />
-        <StatCard title="בבעלותי" value={String(stats.totalOwned)} icon={Package} color="blue" />
-        <StatCard title="סה״כ פריטים" value={String(items.length)} icon={Wallet} color="stone" />
+        <StatCard title="עלות כוללת" value={fmt(summary.totalActual)} icon={Wallet} color="amber" />
+        <StatCard title="שולם" value={fmt(summary.totalPaid)} icon={CheckCircle} color="green" />
+        <StatCard title="נשאר לשלם" value={fmt(summary.totalRemaining)} icon={Clock} color="red" />
+        <StatCard title="קבלן ושיפוץ" value={fmt(summary.contractorTotal)} icon={Activity} color="purple" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-        {/* Incomplete rooms */}
+        {/* Rooms budget status */}
         <div className="glass-card rounded-3xl p-5">
           <h2 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
-            <Home size={16} className="text-amber-500" /> חדרים שלא הושלמו
+            <Home size={16} className="text-amber-500" /> חדרים
           </h2>
-          {incompleteRooms.length === 0 ? (
-            <p className="text-stone-400 text-sm py-4 text-center">🎉 כל החדרים הושלמו!</p>
+          {rooms.length === 0 ? (
+            <p className="text-stone-400 text-sm py-4 text-center">הוסיפו חדרים בתכנון הדירה</p>
           ) : (
             <div className="space-y-3">
-              {incompleteRooms.slice(0, 6).map((c) => (
-                <div key={c.id}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium text-stone-700">{c.emoji} {c.name}</span>
-                    <span className="text-stone-500">{c.completion}% מוכן</span>
+              {rooms.slice(0, 6).map((room) => {
+                const s = getRoomStats(room, items);
+                return (
+                  <div key={room.id}>
+                    <div className="flex justify-between items-center text-sm mb-1">
+                      <span className="font-medium text-stone-700">{room.emoji} {room.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${budgetStatusStyle[s.budgetStatus]}`}>{s.budgetStatus}</span>
+                    </div>
+                    <ProgressBar value={s.plannedBudget > 0 ? s.usedPct : Math.min(100, s.readiness)} color={s.diff < 0 ? 'red' : s.usedPct >= 90 ? 'amber' : 'green'} height="sm" />
+                    <p className="text-[11px] text-stone-400 mt-0.5">בפועל {fmt(s.actualCost)}{s.plannedBudget > 0 ? ` מתוך ${fmt(s.plannedBudget)}` : ''} · שולם {fmt(s.paid)}</p>
                   </div>
-                  <ProgressBar value={c.completion} color={c.completion < 50 ? 'red' : c.completion < 80 ? 'amber' : 'green'} height="sm" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -157,53 +146,53 @@ export default function Dashboard() {
         {/* High priority missing */}
         <div className="glass-card rounded-3xl p-5">
           <h2 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
-            <AlertCircle size={16} className="text-red-500" /> רכישות בעדיפות גבוהה
+            <AlertCircle size={16} className="text-red-500" /> חובה שעוד חסר
           </h2>
           {highPriorityMissing.length === 0 ? (
-            <p className="text-stone-400 text-sm py-4 text-center">✅ אין פריטים בעדיפות גבוהה שחסרים</p>
+            <p className="text-stone-400 text-sm py-4 text-center">✅ אין פריטי חובה חסרים</p>
           ) : (
             <div className="space-y-2">
               {highPriorityMissing.map((item) => {
-                const cat = categories.find((c) => c.id === item.categoryId);
+                const room = rooms.find((r) => r.id === item.roomId);
                 return (
                   <div key={item.id} className="flex items-center justify-between p-2 bg-red-50 rounded-xl">
                     <div>
-                      <p className="text-sm font-medium text-stone-800">{item.name}</p>
-                      <p className="text-xs text-stone-500">{cat?.emoji} {cat?.name}</p>
+                      <p className="text-sm font-medium text-stone-800">{item.emoji} {item.name}</p>
+                      <p className="text-xs text-stone-500">{room?.emoji} {room?.name} · {item.category}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-red-600">{item.estimatedPrice > 0 ? fmt(item.estimatedPrice * item.quantity) : '—'}</p>
-                      {item.isEssential && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">חיוני</span>}
-                    </div>
+                    <p className="text-sm font-semibold text-red-600">{itemActual(item) > 0 ? fmt(itemActual(item)) : '—'}</p>
                   </div>
                 );
               })}
-              <Link href="/shopping" className="block text-center text-sm text-amber-600 font-medium hover:text-amber-700 pt-1">
-                לרשימת הקניות ←
+              <Link href="/planning" className="block text-center text-sm text-amber-600 font-medium hover:text-amber-700 pt-1">
+                לתכנון הדירה ←
               </Link>
             </div>
           )}
         </div>
       </div>
 
-      {/* Category budget breakdown */}
-      {catStats.some((c) => c.total > 0 || c.plannedBudget > 0) && (
+      {/* Category breakdown */}
+      {summary.byCategory.length > 0 && (
         <div className="glass-card rounded-3xl p-5">
           <h2 className="font-bold text-stone-800 mb-4 flex items-center gap-2">
             <TrendingDown size={16} className="text-amber-500" /> פירוט תקציב לפי קטגוריה
           </h2>
-          <div className="grid md:grid-cols-2 gap-3">
-            {catStats.filter((c) => c.total > 0 || c.plannedBudget > 0).map((c) => (
-              <div key={c.id} className={`p-3 rounded-xl border ${c.isOverBudget ? 'border-red-200 bg-red-50' : c.noBudget ? 'border-amber-200 bg-amber-50' : 'border-stone-100 bg-stone-50'}`}>
-                <div className="flex justify-between items-start mb-1.5">
-                  <span className="font-medium text-sm text-stone-800">{c.emoji} {c.name}</span>
-                  <span className={`text-xs font-semibold ${c.isOverBudget ? 'text-red-600' : 'text-stone-500'}`}>
-                    {c.noBudget ? 'ללא תקציב' : `${fmt(c.spent)} / ${fmt(c.plannedBudget)}`}
-                  </span>
+          <div className="grid md:grid-cols-2 gap-x-6 gap-y-2">
+            {summary.byCategory.slice(0, 12).map((c) => {
+              const maxA = summary.byCategory[0].actual || 1;
+              return (
+                <div key={c.category}>
+                  <div className="flex justify-between text-xs mb-0.5">
+                    <span className="text-stone-600">{c.category} <span className="text-stone-400">({c.count})</span></span>
+                    <span className="font-semibold text-stone-700">{fmt(c.actual)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-stone-200 overflow-hidden">
+                    <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.round((c.actual / maxA) * 100)}%` }} />
+                  </div>
                 </div>
-                {!c.noBudget && c.plannedBudget > 0 && <ProgressBar value={c.budgetUsed} color={c.isOverBudget ? 'red' : 'amber'} height="sm" />}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

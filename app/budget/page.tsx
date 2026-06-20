@@ -1,38 +1,71 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { usePlanningStore } from '@/lib/planning/store';
 import { useStore } from '@/lib/store';
-import { getCategoryStats, getDashboardStats, fmt } from '@/lib/utils';
+import { getPlanSummary, getRoomStats, fmt } from '@/lib/planning/geometry';
 import ProgressBar from '@/components/ProgressBar';
-import { Wallet, Check, AlertTriangle } from 'lucide-react';
+import { Wallet, Check, AlertTriangle, Activity, CheckCircle2, Clock, DownloadCloud } from 'lucide-react';
 import Link from 'next/link';
 
+const budgetStatusStyle: Record<string, string> = {
+  'עומד בתקציב': 'bg-emerald-100 text-emerald-700',
+  'קרוב לחריגה': 'bg-amber-100 text-amber-700',
+  'חורג מהתקציב': 'bg-red-100 text-red-700',
+  'שולם מלא': 'bg-blue-100 text-blue-700',
+  'בתהליך': 'bg-stone-100 text-stone-600',
+};
+
 export default function BudgetPage() {
-  const { items, totalBudget, categories, setTotalBudget, setCategoryBudget } = useStore();
-  const [editTotal, setEditTotal] = useState(String(totalBudget || ''));
-  const [editCat, setEditCat] = useState<Record<string, string>>({});
+  const { loaded, load, rooms, items, style, setStyle, updateRoom } = usePlanningStore();
+  const legacy = useStore();
+  const [editTotal, setEditTotal] = useState('');
+  const [editRoom, setEditRoom] = useState<Record<string, string>>({});
   const [savedMsg, setSavedMsg] = useState('');
 
-  const catStats = getCategoryStats(items, categories);
-  const dashStats = getDashboardStats(items, totalBudget, categories);
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  useEffect(() => { setEditTotal(String(style.budget || '')); }, [style.budget, loaded]);
 
-  const flash = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2000); };
+  const flash = (msg: string) => { setSavedMsg(msg); setTimeout(() => setSavedMsg(''), 2200); };
+  const summary = getPlanSummary(rooms, items, style.budget);
 
-  if (categories.length === 0) {
+  if (!loaded) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (rooms.length === 0) {
     return (
       <div className="p-6 text-center space-y-4 max-w-md mx-auto mt-20">
         <Wallet size={48} className="text-stone-300 mx-auto" />
-        <p className="text-stone-500">יש ליצור קטגוריות/חדרים לפני הגדרת תקציב</p>
-        <Link href="/categories" className="inline-block bg-amber-500 text-white px-5 py-3 rounded-xl font-semibold hover:bg-amber-600 transition-colors">
-          הוסף קטגוריות
+        <p className="text-stone-500">התקציב מחושב מהחדרים והפריטים בתכנון הדירה. הוסיפו חדרים כדי להתחיל.</p>
+        <Link href="/planning" className="inline-block text-white px-5 py-3 rounded-xl font-semibold"
+          style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)' }}>
+          לתכנון הדירה
         </Link>
       </div>
     );
   }
 
+  // one-click import of budgets previously set in the legacy category page
+  const canImport = legacy.totalBudget > 0 || legacy.categories.some((c) => c.plannedBudget > 0);
+  const importLegacy = () => {
+    if (legacy.totalBudget > 0 && !style.budget) setStyle({ budget: legacy.totalBudget });
+    rooms.forEach((r) => {
+      if ((r.plannedBudget || 0) === 0) {
+        const c = legacy.categories.find((cat) => cat.name === r.name && cat.plannedBudget > 0);
+        if (c) updateRoom(r.id, { plannedBudget: c.plannedBudget });
+      }
+    });
+    flash('התקציבים יובאו מהקטגוריות ✅');
+  };
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-5 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-stone-900 flex items-center gap-2">
-        <Wallet size={24} className="text-amber-500" /> תכנון תקציב
+      <h1 className="text-xl md:text-2xl font-bold text-stone-900 flex items-center gap-2">
+        <Wallet size={22} className="text-amber-500" /> תכנון תקציב
       </h1>
 
       {savedMsg && (
@@ -41,100 +74,128 @@ export default function BudgetPage() {
         </div>
       )}
 
-      {/* Total budget */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
-        <h2 className="font-bold text-stone-800">תקציב כולל לדירה</h2>
+      {/* Global budget */}
+      <div className="glass-card rounded-3xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-stone-800">תקציב כולל לדירה (אופציונלי)</h2>
+          {canImport && (
+            <button onClick={importLegacy} className="flex items-center gap-1 text-xs text-amber-600 font-semibold hover:text-amber-700">
+              <DownloadCloud size={14} /> ייבא מהקטגוריות
+            </button>
+          )}
+        </div>
         <div className="flex gap-3">
           <div className="relative flex-1">
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">₪</span>
-            <input
-              type="number"
-              value={editTotal}
-              onChange={(e) => setEditTotal(e.target.value)}
-              className="w-full pr-8 pl-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-amber-400"
-              min={0}
-              placeholder="הכנס תקציב..."
-            />
+            <input type="number" value={editTotal} onChange={(e) => setEditTotal(e.target.value)}
+              className="w-full pr-8 pl-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-amber-400 bg-white"
+              min={0} placeholder="הכנס תקציב..." />
           </div>
-          <button
-            onClick={() => { setTotalBudget(Number(editTotal) || 0); flash('התקציב הכולל נשמר ✅'); }}
-            className="px-5 py-2.5 bg-amber-500 text-white rounded-xl font-semibold text-sm hover:bg-amber-600 transition-colors"
-          >
+          <button onClick={() => { setStyle({ budget: Number(editTotal) || 0 }); flash('התקציב הכולל נשמר ✅'); }}
+            className="px-5 py-2.5 text-white rounded-xl font-semibold text-sm"
+            style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)' }}>
             שמור
           </button>
         </div>
-        {totalBudget > 0 && (
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-stone-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-stone-500">תקציב</p>
-                <p className="font-bold text-stone-800">{fmt(totalBudget)}</p>
-              </div>
-              <div className="bg-red-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-red-500">הוצא</p>
-                <p className="font-bold text-red-700">{fmt(dashStats.totalSpent)}</p>
-              </div>
-              <div className={`rounded-xl p-3 text-center ${dashStats.remaining < 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
-                <p className={`text-xs ${dashStats.remaining < 0 ? 'text-red-500' : 'text-emerald-500'}`}>נותר</p>
-                <p className={`font-bold ${dashStats.remaining < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{fmt(dashStats.remaining)}</p>
-              </div>
+
+        {/* live totals from the plan */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="rounded-2xl p-3 text-center" style={{ background: 'rgba(245,158,11,0.10)' }}>
+            <div className="flex items-center justify-center gap-1 text-[11px] text-amber-600"><Wallet size={12} /> עלות כוללת</div>
+            <p className="font-bold text-stone-800 text-sm">{fmt(summary.totalActual)}</p>
+          </div>
+          <div className="rounded-2xl p-3 text-center" style={{ background: 'rgba(34,197,94,0.10)' }}>
+            <div className="flex items-center justify-center gap-1 text-[11px] text-emerald-600"><CheckCircle2 size={12} /> שולם</div>
+            <p className="font-bold text-stone-800 text-sm">{fmt(summary.totalPaid)}</p>
+          </div>
+          <div className="rounded-2xl p-3 text-center" style={{ background: 'rgba(239,68,68,0.08)' }}>
+            <div className="flex items-center justify-center gap-1 text-[11px] text-red-500"><Clock size={12} /> נשאר לשלם</div>
+            <p className="font-bold text-stone-800 text-sm">{fmt(summary.totalRemaining)}</p>
+          </div>
+          <div className="rounded-2xl p-3 text-center" style={{ background: 'rgba(139,92,246,0.10)' }}>
+            <div className="flex items-center justify-center gap-1 text-[11px] text-violet-600"><Activity size={12} /> בריאות</div>
+            <p className="font-bold text-stone-800 text-sm">{summary.healthScore}/100</p>
+          </div>
+        </div>
+
+        {summary.globalBudget > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-stone-500">{fmt(summary.totalActual)} מתוך {fmt(summary.globalBudget)}</span>
+              <span className={`font-semibold ${summary.budgetDiff < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {summary.budgetDiff < 0 ? `חריגה ${fmt(-summary.budgetDiff)}` : `נותר ${fmt(summary.budgetDiff)}`}
+              </span>
             </div>
-            <ProgressBar value={dashStats.budgetUsedPct} color={dashStats.budgetUsedPct > 100 ? 'red' : dashStats.budgetUsedPct > 80 ? 'amber' : 'green'} showLabel />
+            <ProgressBar value={Math.round((summary.totalActual / summary.globalBudget) * 100)} color={summary.overBudget ? 'red' : 'amber'} showLabel />
           </div>
         )}
       </div>
 
-      {/* Category budgets */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
-        <h2 className="font-bold text-stone-800">תקציב לפי קטגוריה</h2>
-        <div className="space-y-4">
-          {catStats.map((c) => {
-            const editVal = editCat[c.id] ?? String(c.plannedBudget || '');
-            const remaining = c.plannedBudget - c.spent;
+      {/* Per-room budgets — same data as תכנון הדירה */}
+      <div className="glass-card rounded-3xl p-5 space-y-3">
+        <h2 className="font-bold text-stone-800">תקציב לפי חדר</h2>
+        <p className="text-xs text-stone-400 -mt-1">העלות מחושבת אוטומטית מהפריטים שהוספתם בכל חדר בתכנון הדירה.</p>
+        <div className="space-y-3">
+          {rooms.map((room) => {
+            const s = getRoomStats(room, items);
+            const editVal = editRoom[room.id] ?? String(room.plannedBudget || '');
+            const over = s.plannedBudget > 0 && s.actualCost > s.plannedBudget;
             return (
-              <div key={c.id} className={`p-4 rounded-xl border ${c.isOverBudget ? 'border-red-200 bg-red-50' : c.noBudget ? 'border-amber-100 bg-amber-50' : 'border-stone-100 bg-stone-50'}`}>
-                <div className="flex flex-wrap gap-3 items-center mb-3">
-                  <span className="font-semibold text-stone-800">{c.emoji} {c.name}</span>
-                  <div className="flex gap-2 flex-1 min-w-0">
-                    <div className="relative flex-1 max-w-36">
+              <div key={room.id} className="rounded-2xl p-4" style={{ background: over ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.5)' }}>
+                <div className="flex flex-wrap gap-2 items-center mb-2">
+                  <span className="font-semibold text-stone-800">{room.emoji} {room.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${budgetStatusStyle[s.budgetStatus]}`}>{s.budgetStatus}</span>
+                  <div className="flex gap-2 flex-1 min-w-0 justify-end">
+                    <div className="relative w-28">
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 text-xs">₪</span>
-                      <input
-                        type="number"
-                        value={editVal}
-                        onChange={(e) => setEditCat((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                        className="w-full pr-6 pl-2 py-1.5 rounded-lg border border-stone-200 text-sm focus:outline-none focus:border-amber-400 bg-white"
-                        min={0}
-                        placeholder="0"
-                      />
+                      <input type="number" value={editVal} onChange={(e) => setEditRoom((p) => ({ ...p, [room.id]: e.target.value }))}
+                        className="w-full pr-6 pl-2 py-1.5 rounded-lg border border-stone-200 text-sm focus:outline-none focus:border-amber-400 bg-white" min={0} placeholder="תקציב" />
                     </div>
-                    <button
-                      onClick={() => { setCategoryBudget(c.id, Number(editVal) || 0); flash(`תקציב ${c.name} נשמר ✅`); }}
-                      className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors"
-                    >
+                    <button onClick={() => { updateRoom(room.id, { plannedBudget: Number(editVal) || 0 }); flash(`תקציב ${room.name} נשמר ✅`); }}
+                      className="px-3 py-1.5 text-white rounded-lg text-sm font-medium" style={{ background: 'linear-gradient(145deg,#fbbf24,#f59e0b)' }}>
                       שמור
                     </button>
                   </div>
-                  {c.isOverBudget && <span className="flex items-center gap-1 text-xs text-red-600 font-medium"><AlertTriangle size={12} /> חריגה</span>}
-                  {c.noBudget && <span className="flex items-center gap-1 text-xs text-amber-600 font-medium"><AlertTriangle size={12} /> ללא תקציב</span>}
                 </div>
-                {(c.spent > 0 || c.plannedBudget > 0) && (
-                  <div className="flex gap-4 text-xs text-stone-600 mb-2">
-                    <span>הוצא: <strong>{fmt(c.spent)}</strong></span>
-                    {c.plannedBudget > 0 && <>
-                      <span>תקציב: <strong>{fmt(c.plannedBudget)}</strong></span>
-                      <span className={remaining < 0 ? 'text-red-600 font-semibold' : 'text-emerald-600'}>
-                        {remaining < 0 ? `חריגה: ${fmt(Math.abs(remaining))}` : `נותר: ${fmt(remaining)}`}
-                      </span>
-                    </>}
-                    <span className="text-stone-400">{c.total} פריטים</span>
-                  </div>
-                )}
-                {c.plannedBudget > 0 && <ProgressBar value={c.budgetUsed} color={c.isOverBudget ? 'red' : 'amber'} showLabel height="sm" />}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600 mb-2">
+                  <span>בפועל: <strong>{fmt(s.actualCost)}</strong></span>
+                  <span className="text-emerald-600">שולם: <strong>{fmt(s.paid)}</strong></span>
+                  <span className="text-amber-600">נשאר: <strong>{fmt(s.remaining)}</strong></span>
+                  {s.plannedBudget > 0 && (
+                    <span className={s.diff < 0 ? 'text-red-600 font-semibold' : 'text-stone-500'}>
+                      {s.diff < 0 ? `חריגה: ${fmt(-s.diff)}` : `פנוי: ${fmt(s.diff)}`}
+                    </span>
+                  )}
+                  <span className="text-stone-400">{s.total} פריטים</span>
+                  {over && <span className="flex items-center gap-1 text-red-600 font-medium"><AlertTriangle size={12} /> חריגה</span>}
+                </div>
+                {s.plannedBudget > 0 && <ProgressBar value={s.usedPct} color={over ? 'red' : s.usedPct >= 90 ? 'amber' : 'green'} showLabel height="sm" />}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* By category */}
+      {summary.byCategory.length > 0 && (
+        <div className="glass-card rounded-3xl p-5 space-y-3">
+          <h2 className="font-bold text-stone-800">תקציב לפי קטגוריה</h2>
+          {summary.byCategory.slice(0, 14).map((c) => {
+            const maxA = summary.byCategory[0].actual || 1;
+            return (
+              <div key={c.category}>
+                <div className="flex justify-between text-xs mb-0.5">
+                  <span className="text-stone-600">{c.category} <span className="text-stone-400">({c.count})</span></span>
+                  <span className="font-semibold text-stone-700">{fmt(c.actual)}{c.paid > 0 && <span className="text-emerald-600 font-normal"> · שולם {fmt(c.paid)}</span>}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-stone-200 overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.round((c.actual / maxA) * 100)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
